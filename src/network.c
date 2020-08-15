@@ -150,7 +150,7 @@ float get_current_rate(network net)
         case EXP:
             return net.learning_rate * pow(net.gamma, batch_num);
         case POLY:
-            return net.learning_rate * pow(1 - (float)batch_num / net.max_batches, net.power);
+            return net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
             //if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);
             //return net.learning_rate * pow(1 - (float)batch_num / net.max_batches, net.power);
         case RANDOM:
@@ -768,16 +768,8 @@ int num_detections_batch(network *net, float thresh, int batch)
 
 detection *make_network_boxes(network *net, float thresh, int *num)
 {
-    int i;
     layer l = net->layers[net->n - 1];
-    for (i = 0; i < net->n; ++i) {
-        layer l_tmp = net->layers[i];
-        if (l_tmp.type == YOLO || l_tmp.type == GAUSSIAN_YOLO || l_tmp.type == DETECTION || l_tmp.type == REGION) {
-            l = l_tmp;
-            break;
-        }
-    }
-
+    int i;
     int nboxes = num_detections(net, thresh);
     if (num) *num = nboxes;
     detection* dets = (detection*)xcalloc(nboxes, sizeof(detection));
@@ -789,10 +781,6 @@ detection *make_network_boxes(network *net, float thresh, int *num)
 
         if (l.coords > 4) dets[i].mask = (float*)xcalloc(l.coords - 4, sizeof(float));
         else dets[i].mask = NULL;
-
-        if(l.embedding_output) dets[i].embeddings = (float*)xcalloc(l.embedding_size, sizeof(float));
-        else dets[i].embeddings = NULL;
-        dets[i].embedding_size = l.embedding_size;
     }
     return dets;
 }
@@ -801,14 +789,6 @@ detection *make_network_boxes_batch(network *net, float thresh, int *num, int ba
 {
     int i;
     layer l = net->layers[net->n - 1];
-    for (i = 0; i < net->n; ++i) {
-        layer l_tmp = net->layers[i];
-        if (l_tmp.type == YOLO || l_tmp.type == GAUSSIAN_YOLO || l_tmp.type == DETECTION || l_tmp.type == REGION) {
-            l = l_tmp;
-            break;
-        }
-    }
-
     int nboxes = num_detections_batch(net, thresh, batch);
     assert(num != NULL);
     *num = nboxes;
@@ -821,10 +801,6 @@ detection *make_network_boxes_batch(network *net, float thresh, int *num, int ba
 
         if (l.coords > 4) dets[i].mask = (float*)xcalloc(l.coords - 4, sizeof(float));
         else dets[i].mask = NULL;
-
-        if (l.embedding_output) dets[i].embeddings = (float*)xcalloc(l.embedding_size, sizeof(float));
-        else dets[i].embeddings = NULL;
-        dets[i].embedding_size = l.embedding_size;
     }
     return dets;
 }
@@ -924,7 +900,6 @@ void free_detections(detection *dets, int n)
         free(dets[i].prob);
         if (dets[i].uc) free(dets[i].uc);
         if (dets[i].mask) free(dets[i].mask);
-        if (dets[i].embeddings) free(dets[i].embeddings);
     }
     free(dets);
 }
@@ -1162,11 +1137,6 @@ float network_accuracy_multi(network net, data d, int n)
     float acc = matrix_topk_accuracy(d.y, guess,1);
     free_matrix(guess);
     return acc;
-}
-
-void free_network_ptr(network* net)
-{
-    free_network(*net);
 }
 
 void free_network(network net)

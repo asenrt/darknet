@@ -359,21 +359,8 @@ softmax_layer parse_softmax(list *options, size_params params)
 contrastive_layer parse_contrastive(list *options, size_params params)
 {
     int classes = option_find_int(options, "classes", 1000);
-    layer *yolo_layer = NULL;
-    int yolo_layer_id = option_find_int_quiet(options, "yolo_layer", 0);
-    if (yolo_layer_id < 0) yolo_layer_id = params.index + yolo_layer_id;
-    if(yolo_layer_id != 0) yolo_layer = params.net.layers + yolo_layer_id;
-    if (yolo_layer->type != YOLO) {
-        printf(" Error: [contrastive] layer should point to the [yolo] layer instead of %d layer! \n", yolo_layer_id);
-        getchar();
-        exit(0);
-    }
-
-    contrastive_layer layer = make_contrastive_layer(params.batch, params.w, params.h, params.c, classes, params.inputs, yolo_layer);
+    contrastive_layer layer = make_contrastive_layer(params.batch, params.w, params.h, params.c, classes, params.inputs);
     layer.temperature = option_find_float_quiet(options, "temperature", 1);
-    layer.steps = params.time_steps;
-    layer.cls_normalizer = option_find_float_quiet(options, "cls_normalizer", 1);
-    layer.max_delta = option_find_float_quiet(options, "max_delta", FLT_MAX);   // set 10
     return layer;
 }
 
@@ -491,26 +478,6 @@ layer parse_yolo(list *options, size_params params)
     l.truth_thresh = option_find_float(options, "truth_thresh", 1);
     l.iou_thresh = option_find_float_quiet(options, "iou_thresh", 1); // recommended to use iou_thresh=0.213 in [yolo]
     l.random = option_find_float_quiet(options, "random", 0);
-
-    l.track_history_size = option_find_int_quiet(options, "track_history_size", 5);
-    l.sim_thresh = option_find_int_quiet(options, "sim_thresh", 0.8);
-    l.dets_for_track = option_find_int_quiet(options, "dets_for_track", 1);
-    l.dets_for_show = option_find_int_quiet(options, "dets_for_show", 1);
-    l.track_ciou_norm = option_find_float_quiet(options, "track_ciou_norm", 0.01);
-    int embedding_layer_id = option_find_int_quiet(options, "embedding_layer", 999999);
-    if (embedding_layer_id < 0) embedding_layer_id = params.index + embedding_layer_id;
-    if (embedding_layer_id != 999999) {
-        printf(" embedding_layer_id = %d, ", embedding_layer_id);
-        layer le = params.net.layers[embedding_layer_id];
-        l.embedding_layer_id = embedding_layer_id;
-        l.embedding_output = (float*)xcalloc(le.batch * le.outputs, sizeof(float));
-        l.embedding_size = le.n / l.n;
-        printf(" embedding_size = %d \n", l.embedding_size);
-        if (le.n % l.n != 0) {
-            printf(" Warning: filters=%d number in embedding_layer=%d isn't divisable by number of anchors %d \n", le.n, embedding_layer_id, l.n);
-            getchar();
-        }
-    }
 
     char *map_file = option_find_str(options, "map", 0);
     if (map_file) l.map = read_map(map_file);
@@ -841,7 +808,6 @@ maxpool_layer parse_maxpool(list *options, size_params params)
     if(!(h && w && c)) error("Layer before [maxpool] layer must output image.");
 
     maxpool_layer layer = make_maxpool_layer(batch, h, w, c, size, stride_x, stride_y, padding, maxpool_depth, out_channels, antialiasing, avgpool, params.train);
-    layer.maxpool_zero_nonmax = option_find_int_quiet(options, "maxpool_zero_nonmax", 0);
     return layer;
 }
 
@@ -1119,6 +1085,7 @@ learning_rate_policy get_policy(char *s)
 
 void parse_net_options(list *options, network *net)
 {
+    net->gen_epochs = option_find_int(options, "gen_epochs", 20);
     net->max_batches = option_find_int(options, "max_batches", 0);
     net->batch = option_find_int(options, "batch",1);
     net->learning_rate = option_find_float(options, "learning_rate", .001);
@@ -1134,10 +1101,9 @@ void parse_net_options(list *options, network *net)
     net->init_sequential_subdivisions = net->sequential_subdivisions = option_find_int_quiet(options, "sequential_subdivisions", subdivs);
     if (net->sequential_subdivisions > subdivs) net->init_sequential_subdivisions = net->sequential_subdivisions = subdivs;
     net->try_fix_nan = option_find_int_quiet(options, "try_fix_nan", 0);
-    net->batch /= subdivs;          // mini_batch
-    const int mini_batch = net->batch;
-    net->batch *= net->time_steps;  // mini_batch * time_steps
-    net->subdivisions = subdivs;    // number of mini_batches
+    net->batch /= subdivs;
+    net->batch *= net->time_steps;
+    net->subdivisions = subdivs;
 
     *net->seen = 0;
     *net->cur_iteration = 0;
@@ -1171,17 +1137,12 @@ void parse_net_options(list *options, network *net)
     net->letter_box = option_find_int_quiet(options, "letter_box", 0);
     net->mosaic_bound = option_find_int_quiet(options, "mosaic_bound", 0);
     net->contrastive = option_find_int_quiet(options, "contrastive", 0);
-    net->contrastive_jit_flip = option_find_int_quiet(options, "contrastive_jit_flip", 0);
     net->unsupervised = option_find_int_quiet(options, "unsupervised", 0);
-    if (net->contrastive && mini_batch < 2) {
-        printf(" Error: mini_batch size (batch/subdivisions) should be higher than 1 for Contrastive loss \n");
-        exit(0);
-    }
     net->label_smooth_eps = option_find_float_quiet(options, "label_smooth_eps", 0.0f);
     net->resize_step = option_find_float_quiet(options, "resize_step", 32);
     net->attention = option_find_int_quiet(options, "attention", 0);
     net->adversarial_lr = option_find_float_quiet(options, "adversarial_lr", 0);
-    net->max_chart_loss = option_find_float_quiet(options, "max_chart_loss", 20.0);
+    net->max_chart_loss = option_find_float_quiet(options, "max_chart_loss", 1.5);
 
     net->angle = option_find_float_quiet(options, "angle", 0);
     net->aspect = option_find_float_quiet(options, "aspect", 1);
@@ -1656,8 +1617,6 @@ network parse_network_cfg_custom(char *filename, int batch, int time_steps)
         }
 
         // pre-allocate memory for inference on Tensor Cores (fp16)
-        *net.max_input16_size = 0;
-        *net.max_output16_size = 0;
         if (net.cudnn_half) {
             *net.max_input16_size = max_inputs;
             CHECK_CUDA(cudaMalloc((void **)net.input16_gpu, *net.max_input16_size * sizeof(short))); //sizeof(half)

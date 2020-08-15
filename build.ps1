@@ -149,10 +149,6 @@ if (Test-Path env:CUDA_PATH) {
     $env:CUDA_TOOLKIT_ROOT_DIR = "${env:CUDA_PATH}"
     Write-Host "Added missing env variable CUDA_TOOLKIT_ROOT_DIR" -ForegroundColor Yellow
   }
-  if (-Not(Test-Path env:CUDACXX)) {
-    $env:CUDACXX = "${env:CUDA_PATH}\bin\nvcc.exe"
-    Write-Host "Added missing env variable CUDACXX" -ForegroundColor Yellow
-  }
 }
 
 if($force_cpp_build) {
