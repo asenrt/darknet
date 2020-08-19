@@ -26,23 +26,31 @@ typedef __compar_fn_t comparison_fn_t;
 int check_mistakes = 0;
 
 static int coco_ids[] = { 1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90 };
+char** gens[2] = { "BBox.exe gen gen1.json", "BBox.exe gen gen2.json" };
+char** gen_lists[2] = { "gen1\\train.txt", "gen2\\train.txt" };
+volatile static int genIdx = 1;
 
-void gen() {
+void* gen() {
     PROCESS_INFORMATION pi;
     STARTUPINFO si;
 
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
     ZeroMemory(&pi, sizeof(pi));
+    custom_atomic_load_int(&genIdx);
+    char* gargs = gens[genIdx];
+
+
+    printf("Using %s to generate images", gargs);
 
     // Start the child process. 
     if (CreateProcess(
         NULL,   // No module name (use command line)
-        "BBox.exe gen gen.json",        // Command line
+        gargs,        // Command line
         NULL,           // Process handle not inheritable
         NULL,           // Thread handle not inheritable
         FALSE,          // Set handle inheritance to FALSE
-        0,              // No creation flags
+        CREATE_NEW_CONSOLE,              // No creation flags
         NULL,           // Use parent's environment block
         NULL,           // Use parent's starting directory 
         &si,            // Pointer to STARTUPINFO structure
@@ -56,8 +64,10 @@ void gen() {
         // Close process and thread handles. 
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
+        printf("Updating train path %s.\n", gen_lists[genIdx]);
     }
     else printf("Creating bbox process failed (%d).\n", GetLastError());
+    return NULL;
 }
 
 void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, int ngpus, int clear, int dont_show, int calc_map, int mjpeg_port, int show_imgs, int benchmark_layers, char* chart_path)
@@ -218,9 +228,18 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 
     int count = 0;
     double time_remaining, avg_time = -1, alpha_time = 0.01;
-    int oneEpochIterations = train_images_num / (net.batch * net.subdivisions);
+    int oneEpochIterations = train_images_num / net.batch;
     int genStep = net.gen_epochs * oneEpochIterations;
     int nextgen = *net.cur_iteration + genStep;
+
+    printf("OneEpoch = %d, iterations ", oneEpochIterations);
+
+    // Launch generation
+    if (pthread_create(&gen_images, NULL, gen, NULL) == 0) {
+        printf("Launched gen");
+    }
+    else printf("Failed to create gen thread");
+
 
     while (get_current_iteration(net) < net.max_batches) {
         float epoch = *net.cur_iteration / (float)oneEpochIterations;
@@ -231,10 +250,25 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         if (*net.cur_iteration >= nextgen) {
             pthread_join(load_thread, 0);
             nextgen += genStep;
-            gen();
-            list* list = get_paths(train_images);
-            net.train_images_num = list->size;
-            args.paths = (char**)list_to_array(list);
+
+            if (pthread_join(gen_images, NULL) == 0) {
+                custom_atomic_load_int(&genIdx);
+                free(args.paths);
+                list* list = get_paths(gen_lists[genIdx]);
+                net.train_images_num = list->size;
+                args.paths = (char**)list_to_array(list);
+                printf("Gen complete. Path to train %s \n", gen_lists[genIdx]);
+                custom_atomic_store_int(&genIdx, (genIdx + 1) % 2);
+
+                // Launch generation
+                if (pthread_create(&gen_images, NULL, gen, NULL) == 0) {
+                    printf("Launched gen");
+                }
+                else printf("Failed to create gen thread");
+            }
+            else  printf("Failed to join gen thread");
+
+            printf(" \n");
         }
 
         if (l.random && count++ % 10 == 0) {
@@ -299,6 +333,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             args.threads = net.sequential_subdivisions * ngpus;
             printf(" sequential_subdivisions = %d, sequence = %d \n", net.sequential_subdivisions, get_sequence_value(net));
         }
+        printf("args.paths[0] %s", args.paths[0]);
 
         load_thread = load_data(args);
 

@@ -149,6 +149,13 @@ float get_current_rate(network net)
             return rate;
         case EXP:
             return net.learning_rate * pow(net.gamma, batch_num);
+        case RTSIN:
+        {
+            double base = net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
+            double prog = (double)batch_num / net.max_batches;
+            double decay = 1.2 - prog;
+            return base - (decay * sin(prog * net.step * batch_num * M_PI / net.max_batches)) / net.scale;
+        }
         case POLY:
             return net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
             //if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);

@@ -1071,6 +1071,7 @@ route_layer parse_route(list *options, size_params params)
 
 learning_rate_policy get_policy(char *s)
 {
+    if (strcmp(s, "rtsin") == 0) return RTSIN;
     if (strcmp(s, "random")==0) return RANDOM;
     if (strcmp(s, "poly")==0) return POLY;
     if (strcmp(s, "constant")==0) return CONSTANT;
@@ -1218,6 +1219,11 @@ void parse_net_options(list *options, network *net)
     } else if (net->policy == POLY || net->policy == RANDOM){
         //net->power = option_find_float(options, "power", 1);
     }
+    else if (net->policy == RTSIN) {
+        net->scale = option_find_float(options, "scale", 1200);
+        net->step = option_find_int(options, "step", 10);
+    }
+
 
 }
 
