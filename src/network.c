@@ -153,7 +153,7 @@ float get_current_rate(network net)
         {
             double base = net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
             double prog = (double)batch_num / net.max_batches;
-            double decay = 1.2 - prog;
+            double decay = 1 - prog;
             return base - (decay * sin(prog * net.step * batch_num * M_PI / net.max_batches)) / net.scale;
         }
         case POLY:
