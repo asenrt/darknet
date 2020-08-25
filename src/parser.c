@@ -1151,6 +1151,9 @@ void parse_net_options(list *options, network *net)
     net->exposure = option_find_float_quiet(options, "exposure", 1);
     net->hue = option_find_float_quiet(options, "hue", 0);
     net->power = option_find_float_quiet(options, "power", 4);
+    net->rt_min_lr = option_find_float_quiet(options, "rt_min_lr", 0.00001);
+    net->rt_damp = option_find_float_quiet(options, "rt_damp", 2);
+
 
     if(!net->inputs && !(net->h && net->w && net->c)) error("No input parameters supplied");
 

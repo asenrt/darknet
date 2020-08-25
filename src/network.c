@@ -154,7 +154,10 @@ float get_current_rate(network net)
             double base = net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
             double prog = (double)batch_num / net.max_batches;
             double decay = 1 - prog;
-            return base - (decay * sin(prog * net.step * batch_num * M_PI / net.max_batches)) / net.scale;
+            double damp = net.rt_damp - prog;
+            double lr = base - (decay * sin(damp * net.step * batch_num * M_PI / net.max_batches)) / net.scale;
+
+            return max(lr, net.rt_min_lr);
         }
         case POLY:
             return net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);

@@ -688,6 +688,8 @@ typedef struct network {
     float gamma;
     float scale;
     float power;
+    float rt_min_lr;
+    float rt_damp;
     int time_steps;
     int step;
     int max_batches;
