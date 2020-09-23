@@ -1880,7 +1880,7 @@ data load_data_augment(char **paths, int n, int m, char **labels, int k, tree *h
             // Mosaic -----------------------------------
             else if (mixup == 3)
             {
-                const float min_offset = 0.2; // 20%
+                const float min_offset = 0.05; 
                 const int cut_x = rand_int(w*min_offset, w*(1 - min_offset));
                 const int cut_y = rand_int(h*min_offset, h*(1 - min_offset));
 
