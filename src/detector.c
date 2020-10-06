@@ -271,11 +271,14 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             printf(" \n");
         }
 
-        if (l.random && count++ % 10 == 0) {
-            float rand_coef = 1.4;
+        if (l.random && count++ % 8 == 0) {
+            float rand_coef = rand_uniform_strong(0.5, 1);
             if (l.random != 1.0) rand_coef = l.random;
             printf("Resizing, random_coef = %.2f \n", rand_coef);
-            float random_val = rand_scale(rand_coef);    // *x or /x
+
+            //float random_val = rand_scale(rand_coef);    // *x or /x
+            float random_val = rand_coef;
+
             int dim_w = roundl(random_val * init_w / net.resize_step + 1) * net.resize_step;
             int dim_h = roundl(random_val * init_h / net.resize_step + 1) * net.resize_step;
             if (random_val < 1 && (dim_w > init_w || dim_h > init_h)) dim_w = init_w, dim_h = init_h;
