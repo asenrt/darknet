@@ -149,6 +149,21 @@ float get_current_rate(network net)
             return rate;
         case EXP:
             return net.learning_rate * pow(net.gamma, batch_num);
+        case RTLOCK:
+        {
+            double low = max(net.learning_rate * pow(1.0 - ((double)batch_num / (double)net.max_batches), net.rt_lock_low_exp), net.rt_min_lr);
+            double upp = max(net.learning_rate * pow(1.0 - ((double)batch_num / (double)net.max_batches), net.rt_lock_upp_exp), net.rt_min_lrup);
+            double sinpart = sin(net.step * (double)batch_num * M_PI / (double)net.max_batches);
+            double lr = (abs(low + upp)/2.0) + (sinpart/(double)net.scale);
+
+            //printf("lrr %f, sinp %f, low %f, upp %f, batch %d, rtlow %f, rtupp %f, step %d, scale %d",
+            //    lr, sinpart, low, upp, batch_num, net.rt_lock_low_exp, net.rt_lock_upp_exp, net.step, net.scale);
+
+            if (lr > upp) lr = upp;
+            if (lr < low) lr = low;
+
+            return lr;
+        }
         case RTSIN:
         {
             double base = net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);

@@ -381,13 +381,14 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         const int iteration = get_current_iteration(net);
         //i = get_current_batch(net);
 
-        int calc_map_for_each = (net.gen_epochs - 1) * train_images_num / (net.batch * net.subdivisions);  // calculate mAP for each 10 Epochs
-        calc_map_for_each = fmax(calc_map_for_each, 100);
-        int next_map_calc = iter_map + calc_map_for_each;
-        next_map_calc = fmax(next_map_calc, net.burn_in);
+        //int calc_map_for_each = 10 * net.gen_epochs * train_images_num / (net.batch * net.subdivisions);  // calculate mAP for each 10 Epochs
+        //calc_map_for_each = fmax(calc_map_for_each, 100);
+        // int next_map_calc = iter_map + calc_map_for_each;
+        // next_map_calc = fmax(next_map_calc, net.burn_in);
         //next_map_calc = fmax(next_map_calc, 400);
+
         if (calc_map) {
-            printf("\n (next mAP calculation at %d iterations) ", next_map_calc);
+            printf("\n (next mAP calculation at %d iterations mod %d == 0) ", iteration, net.map_calc_at);
             if (mean_average_precision > 0) printf("\n Last accuracy mAP@0.5 = %2.2f %%, best = %2.2f %% ", mean_average_precision * 100, best_map * 100);
         }
 
@@ -396,11 +397,12 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             else fprintf(stderr, "\n Tensor Cores are used.\n");
             fflush(stderr);
         }
-        printf("\n %d: %f, %f avg loss, %f rate, %lf seconds, %d images, %f hours left\n", iteration, loss, avg_loss, get_current_rate(net), (what_time_is_it_now() - time), iteration * imgs, avg_time);
+        printf("\n %d: %f, %f avg loss, %f rate, %lf seconds, %d images, %f hours left, maxbatches %d\n",
+            iteration, loss, avg_loss, get_current_rate(net), (what_time_is_it_now() - time), iteration * imgs, avg_time, net.max_batches);
         fflush(stdout);
 
         int draw_precision = 0;
-        if (calc_map && (iteration >= next_map_calc || iteration == net.max_batches)) {
+        if (calc_map && (iteration % net.map_calc_at == 0 || iteration == net.max_batches)) {
             if (l.random) {
                 printf("Resizing to initial size: %d x %d ", init_w, init_h);
                 args.w = init_w;

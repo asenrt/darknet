@@ -1072,6 +1072,7 @@ route_layer parse_route(list *options, size_params params)
 learning_rate_policy get_policy(char *s)
 {
     if (strcmp(s, "rtsin") == 0) return RTSIN;
+    if (strcmp(s, "rtlock") == 0) return RTLOCK;
     if (strcmp(s, "random")==0) return RANDOM;
     if (strcmp(s, "poly")==0) return POLY;
     if (strcmp(s, "constant")==0) return CONSTANT;
@@ -1119,7 +1120,7 @@ void parse_net_options(list *options, network *net)
         net->B2 = option_find_float(options, "B2", .999);
         net->eps = option_find_float(options, "eps", .000001);
     }
-
+    net->map_calc_at = option_find_int_quiet(options, "map_calc_at", 15000);
     net->h = option_find_int_quiet(options, "height",0);
     net->w = option_find_int_quiet(options, "width",0);
     net->c = option_find_int_quiet(options, "channels",0);
@@ -1151,7 +1152,15 @@ void parse_net_options(list *options, network *net)
     net->exposure = option_find_float_quiet(options, "exposure", 1);
     net->hue = option_find_float_quiet(options, "hue", 0);
     net->power = option_find_float_quiet(options, "power", 4);
+    net->step = option_find_int(options, "step", 1);
+    net->scale = option_find_float(options, "scale", 1);
+
+    net->rt_lock_low_exp = option_find_float_quiet(options, "rt_lock_low_exp", 6);
+    net->rt_lock_upp_exp = option_find_float_quiet(options, "rt_lock_upp_exp", 0.6);
+    net->power = option_find_float_quiet(options, "power", 4);
+
     net->rt_min_lr = option_find_float_quiet(options, "rt_min_lr", 0.00001);
+    net->rt_min_lrup = option_find_float_quiet(options, "rt_min_lrup", 0.0002);
     net->rt_damp = option_find_float_quiet(options, "rt_damp", 2);
 
 
