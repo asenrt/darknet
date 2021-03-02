@@ -1121,6 +1121,7 @@ void parse_net_options(list *options, network *net)
         net->eps = option_find_float(options, "eps", .000001);
     }
     net->map_calc_at = option_find_int_quiet(options, "map_calc_at", 15000);
+    net->launch_external_proc_at = option_find_int_quiet(options, "launch_external_proc_at", -1);
     net->h = option_find_int_quiet(options, "height",0);
     net->w = option_find_int_quiet(options, "width",0);
     net->c = option_find_int_quiet(options, "channels",0);
@@ -1163,6 +1164,9 @@ void parse_net_options(list *options, network *net)
     net->rt_min_lrup = option_find_float_quiet(options, "rt_min_lrup", 0.0002);
     net->rt_damp = option_find_float_quiet(options, "rt_damp", 2);
 
+    char * tempCmd = option_find_str(options, "external_proc_cmd", "");
+    net->external_proc_cmd = malloc(strlen(tempCmd) + 1);
+    strcpy(net->external_proc_cmd, tempCmd);
 
     if(!net->inputs && !(net->h && net->w && net->c)) error("No input parameters supplied");
 

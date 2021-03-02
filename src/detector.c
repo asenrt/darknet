@@ -70,6 +70,37 @@ void* gen() {
     return NULL;
 }
 
+void* launchExternalProc(char* launchCmd) {
+    PROCESS_INFORMATION pi;
+    STARTUPINFO si;
+
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    if (CreateProcess(
+        NULL, // No module name (use command line)
+        launchCmd, // Command line
+        NULL, // Process handle not inheritable
+        NULL, // Thread handle not inheritable
+        FALSE,// Set handle inheritance to FALSE
+        CREATE_NEW_CONSOLE,              // No creation flags
+        NULL, // Use parent's environment block
+        NULL, // Use parent's starting directory 
+        &si,  // Pointer to STARTUPINFO structure
+        &pi)  // Pointer to PROCESS_INFORMATION structure
+        )
+    {
+        printf("External process start");
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        printf("External process complete");;
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+    else printf("Failed to launch the external process (%d).\n", GetLastError());
+    return NULL;
+}
+
 void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, int ngpus, int clear, int dont_show, int calc_map, int mjpeg_port, int show_imgs, int benchmark_layers, char* chart_path)
 {
     list* options = read_data_cfg(datacfg);
@@ -245,6 +276,12 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         float epoch = *net.cur_iteration / (float)oneEpochIterations;
         printf("Next gen: %d, epoch: %f seen: %ld ", nextgen, epoch, (long)*net.seen);
         printf("OneEpoch = %d, iterations ", oneEpochIterations);
+
+        // Launch external program
+        if (*net.cur_iteration % net.launch_external_proc_at == 0 &&
+            net.external_proc_cmd != NULL && net.external_proc_cmd[0] != '\0') {
+            launchExternalProc(net.external_proc_cmd);
+        }
 
         // Start bbox image genetation
         if (*net.cur_iteration >= nextgen) {

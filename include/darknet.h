@@ -693,7 +693,9 @@ typedef struct network {
     float rt_min_lr;
     float rt_min_lrup;
     float rt_damp;
-    int map_calc_at;
+    int map_calc_at; // calculates map at iterations mod this value
+    int launch_external_proc_at; // launches external process at iteration mod this value
+    char* external_proc_cmd; // the program to run
     int time_steps;
     int step;
     int max_batches;
