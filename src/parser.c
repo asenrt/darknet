@@ -1087,7 +1087,7 @@ learning_rate_policy get_policy(char *s)
 
 void parse_net_options(list *options, network *net)
 {
-    net->gen_epochs = option_find_int(options, "gen_epochs", 20);
+    net->cc_launch_epochs = option_find_int(options, "cc_launch_epochs", 20);
     net->max_batches = option_find_int(options, "max_batches", 0);
     net->batch = option_find_int(options, "batch",1);
     net->learning_rate = option_find_float(options, "learning_rate", .001);
@@ -1120,8 +1120,9 @@ void parse_net_options(list *options, network *net)
         net->B2 = option_find_float(options, "B2", .999);
         net->eps = option_find_float(options, "eps", .000001);
     }
-    net->map_calc_at = option_find_int_quiet(options, "map_calc_at", 15000);
+    net->map_calc_iterations = option_find_int_quiet(options, "map_calc_at", 15000);
     net->launch_external_proc_at = option_find_int_quiet(options, "launch_external_proc_at", -1);
+    net->cc_launch_iterations = option_find_int_quiet(options, "cc_launch_external_proc_at", -1);
     net->h = option_find_int_quiet(options, "height",0);
     net->w = option_find_int_quiet(options, "width",0);
     net->c = option_find_int_quiet(options, "channels",0);
@@ -1167,6 +1168,14 @@ void parse_net_options(list *options, network *net)
     char * tempCmd = option_find_str(options, "external_proc_cmd", "");
     net->external_proc_cmd = malloc(strlen(tempCmd) + 1);
     strcpy(net->external_proc_cmd, tempCmd);
+
+    char * tempCmdcc = option_find_str(options, "cc_external_proc_cmd", "");
+    net->cc_external_proc_cmd = malloc(strlen(tempCmdcc) + 1);
+    strcpy(net->cc_external_proc_cmd, tempCmdcc);
+
+    char* ccOutput = option_find_str(options, "cc_launch_output_file", "");
+    net->cc_launch_output_file = malloc(strlen(ccOutput) + 1);
+    strcpy(net->cc_launch_output_file, ccOutput);
 
     if(!net->inputs && !(net->h && net->w && net->c)) error("No input parameters supplied");
 

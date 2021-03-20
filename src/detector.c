@@ -17,60 +17,37 @@ typedef __compar_fn_t comparison_fn_t;
 #endif
 #endif
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+
 #include "http_stream.h"
 #include <windows.h>
 #include <stdio.h>
 #include <tchar.h>
 
+int fexists(const char* fname)
+{
+    FILE* file;
+    if ((file = fopen(fname, "r")))
+    {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
 
 int check_mistakes = 0;
 
 static int coco_ids[] = { 1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90 };
-char** gens[2] = { "BBox.exe gen gen1.json", "BBox.exe gen gen2.json" };
-char** gen_lists[2] = { "gen1\\train.txt", "gen2\\train.txt" };
-volatile static int genIdx = 1;
 
-void* gen() {
-    PROCESS_INFORMATION pi;
-    STARTUPINFO si;
-
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    ZeroMemory(&pi, sizeof(pi));
-    custom_atomic_load_int(&genIdx);
-    char* gargs = gens[genIdx];
-
-
-    printf("Using %s to generate images", gargs);
-
-    // Start the child process. 
-    if (CreateProcess(
-        NULL,   // No module name (use command line)
-        gargs,        // Command line
-        NULL,           // Process handle not inheritable
-        NULL,           // Thread handle not inheritable
-        FALSE,          // Set handle inheritance to FALSE
-        CREATE_NEW_CONSOLE,              // No creation flags
-        NULL,           // Use parent's environment block
-        NULL,           // Use parent's starting directory 
-        &si,            // Pointer to STARTUPINFO structure
-        &pi)           // Pointer to PROCESS_INFORMATION structure
-        )
-    {
-        printf("Generating images");
-        // Wait until child process exits.
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        printf("Generation complete");
-        // Close process and thread handles. 
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-        printf("Updating train path %s.\n", gen_lists[genIdx]);
-    }
-    else printf("Creating bbox process failed (%d).\n", GetLastError());
-    return NULL;
-}
-
-void* launchExternalProc(char* launchCmd) {
+void* launchExternalProc(void* cmd) {
+    char* launchCmd = (char*)cmd;
     PROCESS_INFORMATION pi;
     STARTUPINFO si;
 
@@ -98,6 +75,8 @@ void* launchExternalProc(char* launchCmd) {
         CloseHandle(pi.hThread);
     }
     else printf("Failed to launch the external process (%d).\n", GetLastError());
+
+    free(cmd);
     return NULL;
 }
 
@@ -255,55 +234,77 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     //printf(" imgs = %d \n", imgs);
 
     pthread_t load_thread = load_data(args);
-    pthread_t gen_images;
-
+    pthread_t cc_launch;
+    int isccinit = 0;
     int count = 0;
+    int nextmap = net.map_calc_iterations;
     double time_remaining, avg_time = -1, alpha_time = 0.01;
     int oneEpochIterations = train_images_num / net.batch;
-    int genStep = net.gen_epochs * oneEpochIterations;
-    int nextgen = *net.cur_iteration + genStep;
+    int ccLaunchesCount = 0;
+    int slstep = net.cc_launch_iterations; // Syncronous launch every n iterations
+    int ccstep = net.cc_launch_epochs > 0 ? net.cc_launch_epochs * oneEpochIterations : net.cc_launch_iterations;
+    int nextcc = *net.cur_iteration + ccstep;
+    int nextsl = *net.cur_iteration + slstep;
 
-    printf("OneEpoch = %d, iterations ", oneEpochIterations);
-
-    // Launch generation
-    if (pthread_create(&gen_images, NULL, gen, NULL) == 0) {
-        printf("Launched gen");
-    }
-    else printf("Failed to create gen thread");
-
+    // Delete the out file
+    if (net.cc_launch_output_file && net.cc_launch_output_file[0] != '\0') remove(net.cc_launch_output_file);
 
     while (get_current_iteration(net) < net.max_batches) {
         float epoch = *net.cur_iteration / (float)oneEpochIterations;
-        printf("Next gen: %d, epoch: %f seen: %ld ", nextgen, epoch, (long)*net.seen);
-        printf("OneEpoch = %d, iterations ", oneEpochIterations);
+        printf(KCYN);
+        printf("  EPOCH: %f 1e = %di\n", epoch, oneEpochIterations);
+        printf(" IMAGES: %d \n", net.train_images_num);
+        if (nextcc > 0) printf(" NEXTCC: %d \n", nextcc);
+        if (nextsl > 0) printf(" NEXTSL: %d \n ", nextsl);
+        printf("\n");
+        printf(KNRM);
 
-        // Launch external program
-        if (*net.cur_iteration % net.launch_external_proc_at == 0 &&
-            net.external_proc_cmd != NULL && net.external_proc_cmd[0] != '\0') {
+        // Launch external program 
+        if (*net.cur_iteration >= nextsl && net.external_proc_cmd != NULL && net.external_proc_cmd[0] != '\0') {
+            nextsl += slstep;
             launchExternalProc(net.external_proc_cmd);
         }
 
-        // Start bbox image genetation
-        if (*net.cur_iteration >= nextgen) {
+        // Start cc_external_proc_cmd in a new thread
+        if (*net.cur_iteration > nextcc && net.cc_external_proc_cmd != NULL && net.cc_external_proc_cmd[0] != '\0') {
+            ccLaunchesCount++;
+            nextcc += ccstep;
             pthread_join(load_thread, 0);
-            nextgen += genStep;
 
-            if (pthread_join(gen_images, NULL) == 0) {
-                custom_atomic_load_int(&genIdx);
-                free(args.paths);
-                list* list = get_paths(gen_lists[genIdx]);
-                net.train_images_num = list->size;
-                args.paths = (char**)list_to_array(list);
-                printf("Gen complete. Path to train %s \n", gen_lists[genIdx]);
-                custom_atomic_store_int(&genIdx, (genIdx + 1) % 2);
+            if (!isccinit || pthread_join(cc_launch, NULL) == 0) {
+                printf("Joined %s \n", net.cc_launch_output_file);
+
+                // Try to read the new train list from cc_launch.output
+                if (net.cc_launch_output_file && net.cc_launch_output_file[0] != '\0' && fexists(net.cc_launch_output_file)) {
+                    free(args.paths);
+                    list* ccout = read_data_cfg(net.cc_launch_output_file);
+                    char* train_list = option_find_str(ccout, "train", "");
+                    list* list = get_paths(train_list);
+                    net.train_images_num = list->size;
+                    args.paths = (char**)list_to_array(list);
+                    printf("New train list at %s \n", train_list);
+                }
+
+                // Make the cc lauch command and launch
+                char* cmdline = malloc(sizeof(char) * 1024);
+                char* pos = cmdline;
+                pos += sprintf(cmdline, net.cc_external_proc_cmd);
+                pos += sprintf(pos, " -ITERATION %d", *net.cur_iteration);
+                pos += sprintf(pos, " -LAUNCH %d", ccLaunchesCount);
 
                 // Launch generation
-                if (pthread_create(&gen_images, NULL, gen, NULL) == 0) {
-                    printf("Launched gen");
+                if (pthread_create(&cc_launch, NULL, launchExternalProc, cmdline) == 0) {
+                    isccinit = 1;
+                    printf("cc program launch \n");
                 }
-                else printf("Failed to create gen thread");
+                else {
+                    isccinit = 0;
+                    printf("Failed to create cc_launch thread");
+                    free(cmdline);
+                    free(pos);
+                }
             }
-            else  printf("Failed to join gen thread");
+            else  printf("Failed to join cc thread");
 
             printf(" \n");
         }
@@ -373,7 +374,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             args.threads = net.sequential_subdivisions * ngpus;
             printf(" sequential_subdivisions = %d, sequence = %d \n", net.sequential_subdivisions, get_sequence_value(net));
         }
-        printf("args.paths[0] %s", args.paths[0]);
+        // printf("args.paths[0] %s", args.paths[0]);
 
         load_thread = load_data(args);
 
@@ -416,30 +417,37 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         avg_loss = avg_loss * .9 + loss * .1;
 
         const int iteration = get_current_iteration(net);
-        //i = get_current_batch(net);
-
-        //int calc_map_for_each = 10 * net.gen_epochs * train_images_num / (net.batch * net.subdivisions);  // calculate mAP for each 10 Epochs
-        //calc_map_for_each = fmax(calc_map_for_each, 100);
-        // int next_map_calc = iter_map + calc_map_for_each;
-        // next_map_calc = fmax(next_map_calc, net.burn_in);
-        //next_map_calc = fmax(next_map_calc, 400);
-
-        if (calc_map) {
-            printf("\n (next mAP calculation at %d iterations mod %d == 0) ", iteration, net.map_calc_at);
-            if (mean_average_precision > 0) printf("\n Last accuracy mAP@0.5 = %2.2f %%, best = %2.2f %% ", mean_average_precision * 100, best_map * 100);
-        }
 
         if (net.cudnn_half) {
             if (iteration < net.burn_in * 3) fprintf(stderr, "\n Tensor Cores are disabled until the first %d iterations are reached.\n", 3 * net.burn_in);
             else fprintf(stderr, "\n Tensor Cores are used.\n");
             fflush(stderr);
         }
-        printf("\n %d: %f, %f avg loss, %f rate, %lf seconds, %d images, %f hours left, maxbatches %d\n",
-            iteration, loss, avg_loss, get_current_rate(net), (what_time_is_it_now() - time), iteration * imgs, avg_time, net.max_batches);
+
+        printf(KCYN);
+        printf("\n");
+        printf("   ITER: %d \n", iteration);
+        printf("  LRATE: %4.6f \n", get_current_rate(net));
+        printf("   LOSS: %4.4f \n", loss);
+        printf("   AVGL: %4.4f \n", avg_loss);
+        printf("    ETA: %4.2fh \n", avg_time);
+        if (calc_map) {
+            printf("    MAP: %d \n", nextmap);
+            if (mean_average_precision > 0) {
+                printf("LASTMAP: %2.2f \n", mean_average_precision * 100);
+                printf("BESTMAP: %2.2f \n", best_map * 100);
+            }
+        }
+        printf(KNRM);
+
+        //    printf("\n %d: %f, %f avg loss, %f rate, %lf seconds, %d images, %f hours left, maxbatches %d\n",
+        //        iteration, loss, avg_loss, get_current_rate(net), (what_time_is_it_now() - time), iteration * imgs, avg_time, net.max_batches);
+
         fflush(stdout);
 
         int draw_precision = 0;
-        if (calc_map && (iteration % net.map_calc_at == 0 || iteration == net.max_batches)) {
+        if (calc_map && (iteration >= nextmap || iteration == net.max_batches)) {
+            nextmap += net.map_calc_iterations;
             if (l.random) {
                 printf("Resizing to initial size: %d x %d ", init_w, init_h);
                 args.w = init_w;
@@ -553,7 +561,6 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         free_network(net_map);
     }
 }
-
 
 static int get_coco_image_id(char* filename)
 {
@@ -897,9 +904,9 @@ void validate_detector(char* datacfg, char* cfgfile, char* weightfile, char* out
     if (fps) {
         for (j = 0; j < classes; ++j) {
             fclose(fps[j]);
-        }
-        free(fps);
     }
+        free(fps);
+}
     if (coco) {
 #ifdef WIN32
         fseek(fp, -3, SEEK_CUR);
@@ -928,7 +935,7 @@ void validate_detector(char* datacfg, char* cfgfile, char* weightfile, char* out
     if (buf_resized) free(buf_resized);
 
     fprintf(stderr, "Total Detection Time: %f Seconds\n", (double)time(0) - start);
-}
+    }
 
 void validate_detector_recall(char* datacfg, char* cfgfile, char* weightfile)
 {
@@ -1997,7 +2004,7 @@ void draw_object(char* datacfg, char* cfgfile, char* weightfile, char* filename,
     free(alphabet);
 
     free_network(net);
-}
+        }
 #else // defined(OPENCV) && defined(GPU)
 void draw_object(char* datacfg, char* cfgfile, char* weightfile, char* filename, float thresh, int dont_show, int it_num,
     int letter_box, int benchmark_layers)

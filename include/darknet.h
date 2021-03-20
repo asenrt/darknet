@@ -662,7 +662,6 @@ typedef enum {
 
 // network.h
 typedef struct network {
-    int gen_epochs;
     int n;
     int batch;
     uint64_t *seen;
@@ -693,9 +692,13 @@ typedef struct network {
     float rt_min_lr;
     float rt_min_lrup;
     float rt_damp;
-    int map_calc_at; // calculates map at iterations mod this value
+    int map_calc_iterations; // calculates map aever n iterations
+    int cc_launch_epochs; // This overrides cc_launch_iterations if cc_launch_epochs > 0
     int launch_external_proc_at; // launches external process at iteration mod this value
     char* external_proc_cmd; // the program to run
+    int cc_launch_iterations; // launches in separate thread
+    char* cc_external_proc_cmd; // the cc program to run
+    char* cc_launch_output_file; // A txt file used as a comminication between the cc_program and darknet
     int time_steps;
     int step;
     int max_batches;
