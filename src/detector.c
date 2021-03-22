@@ -418,11 +418,6 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 
         const int iteration = get_current_iteration(net);
 
-        if (net.cudnn_half) {
-            if (iteration < net.burn_in * 3) fprintf(stderr, "\n Tensor Cores are disabled until the first %d iterations are reached.\n", 3 * net.burn_in);
-            else fprintf(stderr, "\n Tensor Cores are used.\n");
-            fflush(stderr);
-        }
 
         printf(KCYN);
         printf("\n");
@@ -432,12 +427,18 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         printf("   AVGL: %4.4f \n", avg_loss);
         printf("    ETA: %4.2fh \n", avg_time);
         if (calc_map) {
-            printf("    MAP: %d \n", nextmap);
+            printf("  MAPAT: %d \n", nextmap);
             if (mean_average_precision > 0) {
                 printf("LASTMAP: %2.2f \n", mean_average_precision * 100);
                 printf("BESTMAP: %2.2f \n", best_map * 100);
             }
         }
+
+        if (net.cudnn_half) {
+            if (iteration < net.burn_in * 3) printf(" TCORES: After %di \n", net.burn_in * 3);
+            else printf(" TCORES: Used \n");
+        }
+
         printf(KNRM);
 
         //    printf("\n %d: %f, %f avg loss, %f rate, %lf seconds, %d images, %f hours left, maxbatches %d\n",
@@ -904,9 +905,9 @@ void validate_detector(char* datacfg, char* cfgfile, char* weightfile, char* out
     if (fps) {
         for (j = 0; j < classes; ++j) {
             fclose(fps[j]);
-    }
+        }
         free(fps);
-}
+    }
     if (coco) {
 #ifdef WIN32
         fseek(fp, -3, SEEK_CUR);
@@ -935,7 +936,7 @@ void validate_detector(char* datacfg, char* cfgfile, char* weightfile, char* out
     if (buf_resized) free(buf_resized);
 
     fprintf(stderr, "Total Detection Time: %f Seconds\n", (double)time(0) - start);
-    }
+}
 
 void validate_detector_recall(char* datacfg, char* cfgfile, char* weightfile)
 {
@@ -2004,7 +2005,7 @@ void draw_object(char* datacfg, char* cfgfile, char* weightfile, char* filename,
     free(alphabet);
 
     free_network(net);
-        }
+}
 #else // defined(OPENCV) && defined(GPU)
 void draw_object(char* datacfg, char* cfgfile, char* weightfile, char* filename, float thresh, int dont_show, int it_num,
     int letter_box, int benchmark_layers)
