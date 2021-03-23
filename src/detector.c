@@ -17,6 +17,11 @@ typedef __compar_fn_t comparison_fn_t;
 #endif
 #endif
 
+#include "http_stream.h"
+#include <windows.h>
+#include <stdio.h>
+#include <tchar.h>
+
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
 #define KGRN  "\x1B[32m"
@@ -26,10 +31,6 @@ typedef __compar_fn_t comparison_fn_t;
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
-#include "http_stream.h"
-#include <windows.h>
-#include <stdio.h>
-#include <tchar.h>
 
 int fexists(const char* fname)
 {
@@ -68,9 +69,9 @@ void* launchExternalProc(void* cmd) {
         &pi)  // Pointer to PROCESS_INFORMATION structure
         )
     {
-        printf("External process start");
+        printf("External process start: %s \n", launchCmd);
         WaitForSingleObject(pi.hProcess, INFINITE);
-        printf("External process complete");;
+        printf("External process complete \n");;
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
     }
@@ -241,7 +242,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     double time_remaining, avg_time = -1, alpha_time = 0.01;
     int oneEpochIterations = train_images_num / net.batch;
     int ccLaunchesCount = 0;
-    int slstep = net.cc_launch_iterations; // Syncronous launch every n iterations
+    int slstep = net.sl_launch_iterations; // Syncronous launch every n iterations
     int ccstep = net.cc_launch_epochs > 0 ? net.cc_launch_epochs * oneEpochIterations : net.cc_launch_iterations;
     int nextcc = *net.cur_iteration + ccstep;
     int nextsl = *net.cur_iteration + slstep;
@@ -251,18 +252,18 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 
     while (get_current_iteration(net) < net.max_batches) {
         float epoch = *net.cur_iteration / (float)oneEpochIterations;
-        printf(KCYN);
+        //printf(KCYN);
         printf("  EPOCH: %f 1e = %di\n", epoch, oneEpochIterations);
         printf(" IMAGES: %d \n", net.train_images_num);
         if (nextcc > 0) printf(" NEXTCC: %d \n", nextcc);
         if (nextsl > 0) printf(" NEXTSL: %d \n ", nextsl);
         printf("\n");
-        printf(KNRM);
+        //printf(KNRM);
 
         // Launch external program 
-        if (*net.cur_iteration >= nextsl && net.external_proc_cmd != NULL && net.external_proc_cmd[0] != '\0') {
+        if (*net.cur_iteration >= nextsl && net.sl_external_proc_cmd != NULL && net.sl_external_proc_cmd[0] != '\0') {
             nextsl += slstep;
-            launchExternalProc(net.external_proc_cmd);
+            launchExternalProc(net.sl_external_proc_cmd);
         }
 
         // Start cc_external_proc_cmd in a new thread
@@ -419,7 +420,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         const int iteration = get_current_iteration(net);
 
 
-        printf(KCYN);
+        //printf(KCYN);
         printf("\n");
         printf("   ITER: %d \n", iteration);
         printf("  LRATE: %4.6f \n", get_current_rate(net));
@@ -439,7 +440,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             else printf(" TCORES: Used \n");
         }
 
-        printf(KNRM);
+        //printf(KNRM);
 
         //    printf("\n %d: %f, %f avg loss, %f rate, %lf seconds, %d images, %f hours left, maxbatches %d\n",
         //        iteration, loss, avg_loss, get_current_rate(net), (what_time_is_it_now() - time), iteration * imgs, avg_time, net.max_batches);
