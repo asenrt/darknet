@@ -22,7 +22,7 @@ extern "C" {
 #include <algorithm>
 #include <cmath>
 
-#define NFRAMES 1 
+#define NFRAMES 3
 
 //static Detector* detector = NULL;
 static std::unique_ptr<Detector> detector;
@@ -305,7 +305,7 @@ LIB_API std::vector<bbox_t> Detector::detect(image_t img, float thresh, bool use
         memcpy(detector_gpu.predictions[detector_gpu.demo_index], prediction, l.outputs * sizeof(float));
         mean_arrays(detector_gpu.predictions, NFRAMES, l.outputs, detector_gpu.avg);
         l.output = detector_gpu.avg;
-        detector_gpu.demo_index = 0;// (detector_gpu.demo_index + 1) % NFRAMES;
+        detector_gpu.demo_index = (detector_gpu.demo_index + 1) % NFRAMES;
     }
     //get_region_boxes(l, 1, 1, thresh, detector_gpu.probs, detector_gpu.boxes, 0, 0);
     //if (nms) do_nms_sort(detector_gpu.boxes, detector_gpu.probs, l.w*l.h*l.n, l.classes, nms);
