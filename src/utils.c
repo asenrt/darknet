@@ -38,6 +38,7 @@ void *xcalloc(size_t nmemb, size_t size) {
     if(!ptr) {
         calloc_error();
     }
+    memset(ptr, 0, nmemb * size);
     return ptr;
 }
 
@@ -379,7 +380,10 @@ void strip(char *s)
     for(i = 0; i < len; ++i){
         char c = s[i];
         if(c==' '||c=='\t'||c=='\n'||c =='\r'||c==0x0d||c==0x0a) ++offset;
-        else s[i-offset] = c;
+        else {
+            if (c == '+') c = ' ';
+            s[i - offset] = c;
+        }
     }
     s[len-offset] = '\0';
 }
