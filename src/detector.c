@@ -258,6 +258,9 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     int nextcc = *net.cur_iteration + ccstep;
     int nextsl = *net.cur_iteration + slstep;
 
+    int ci = get_current_iteration(net);
+    if (ci > nextmap) nextmap = floor(ci / nextmap) * net.map_calc_iterations;
+
     // Delete the out file
     if (net.cc_launch_output_file && net.cc_launch_output_file[0] != '\0') remove(net.cc_launch_output_file);
 
