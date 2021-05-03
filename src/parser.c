@@ -1252,6 +1252,14 @@ void parse_net_options(list *options, network *net)
     net->cc_launch_output_file = malloc(strlen(ccOutput) + 1);
     strcpy(net->cc_launch_output_file, ccOutput);
 
+    char* noise_paths = option_find_str(options, "noise_paths", "");
+    net->noise_file = malloc(strlen(noise_paths) + 1);
+    strcpy(net->noise_file, noise_paths);
+
+    net->noise_prob = option_find_float_quiet(options, "noise_prob", 0.0f);
+    net->noise_min = option_find_float_quiet(options, "noise_min", 0.05f);
+    net->noise_max = option_find_float_quiet(options, "noise_max", 0.5f);
+
     if(!net->inputs && !(net->h && net->w && net->c)) error("No input parameters supplied");
 
     char *policy_s = option_find_str(options, "policy", "constant");

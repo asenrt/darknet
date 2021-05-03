@@ -106,6 +106,8 @@ image image_data_augmentation(mat_cv* mat, int w, int h,
 // blend two images with (alpha and beta)
 void blend_images_cv(image new_img, float alpha, image old_img, float beta);
 
+void overlay_noise(char* pngpath, float alpha, image jpg);
+
 // bilateralFilter bluring
 image blur_image(image src_img, int ksize);
 

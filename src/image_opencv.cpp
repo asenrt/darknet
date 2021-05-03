@@ -140,7 +140,7 @@ cv::Mat load_image_mat(char *filename, int channels)
     else if (channels == 1) flag = cv::IMREAD_GRAYSCALE;
     else if (channels == 3) flag = cv::IMREAD_COLOR;
     else {
-        fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
+        //fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
     }
     //flag |= IMREAD_IGNORE_ORIENTATION;    // un-comment it if you want
 
@@ -1324,6 +1324,32 @@ extern "C" void blend_images_cv(image new_img, float alpha, image old_img, float
     cv::Mat new_mat(cv::Size(new_img.w, new_img.h), CV_32FC(new_img.c), new_img.data);// , size_t step = AUTO_STEP)
     cv::Mat old_mat(cv::Size(old_img.w, old_img.h), CV_32FC(old_img.c), old_img.data);
     cv::addWeighted(new_mat, alpha, old_mat, beta, 0.0, new_mat);
+}
+
+extern "C" void overlay_noise(char* pngpath, float alpha, image jpg)
+{
+    cv::Mat pngmat = cv::imread(pngpath, -1);
+    cv::resize(pngmat, pngmat, cv::Size(jpg.w, jpg.h));
+    cv::imwrite("noise.png", pngmat);
+
+    // Rotate the noise at center
+    cv::Point2f center(pngmat.cols / 2., pngmat.rows / 2.);
+    double angle = rand_uniform_strong(0, 360);
+    cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
+    cv::warpAffine(pngmat, pngmat, r, pngmat.size());
+
+    float beta = 1 - alpha;
+
+    for (int i = 0; i < jpg.h; i++) 
+        for (int j = 0; j < jpg.w; j++)
+            for(int c = 0; c < jpg.c; c++){
+                cv::Vec4b bytes = pngmat.at<cv::Vec4b>(i, j);
+                if (bytes[3] > 0) {
+                    int pos = c * jpg.h * jpg.w + i * jpg.w + j;
+                    int ic = 2 - c; // Swap R and B
+                    jpg.data[pos] = (beta * jpg.data[pos] + (alpha * pngmat.at<cv::Vec4b>(i, j)[ic]) / 255.0f);
+                }
+            }
 }
 
 // bilateralFilter bluring

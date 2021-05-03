@@ -747,6 +747,12 @@ typedef struct network {
     int cc_launch_iterations; // launches in separate thread
     char* cc_external_proc_cmd; // the cc program to run
     char* cc_launch_output_file; // A txt file used as a comminication between the cc_program and darknet
+    char* noise_file; // A txt file with the paths of the alpha transparent noise overlays
+    float noise_prob; // Prob of adding noise
+    float noise_min; // Opacity range from 
+    float noise_max; // Opacity range to
+
+
     int time_steps;
     int step;
     int max_batches;
@@ -952,6 +958,11 @@ typedef enum {
 // data.h
 typedef struct load_args {
     int threads;
+    char **noise_paths;
+    int noise_paths_count;
+    float noise_prob;
+    float noise_min;
+    float noise_max;
     char **paths;
     char *path;
     int n;

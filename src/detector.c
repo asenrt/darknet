@@ -224,7 +224,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 #ifdef OPENCV
     //int num_threads = get_num_threads();
     //if(num_threads > 2) args.threads = get_num_threads() - 2;
-    args.threads = 6 * ngpus;   // 3 for - Amazon EC2 Tesla V100: p3.2xlarge (8 logical cores) - p3.16xlarge
+    args.threads = 1;// 6 * ngpus;   // 3 for - Amazon EC2 Tesla V100: p3.2xlarge (8 logical cores) - p3.16xlarge
     //args.threads = 12 * ngpus;    // Ryzen 7 2700X (16 logical cores)
     mat_cv* img = NULL;
     float max_img_loss = net.max_chart_loss;
@@ -234,7 +234,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     sprintf(windows_name, "chart_%s.png", base);
     img = draw_train_chart(windows_name, max_img_loss, net.max_batches, number_of_lines, img_size, dont_show, chart_path);
 #endif    //OPENCV
-    if (net.contrastive && args.threads > net.batch/2) args.threads = net.batch / 2;
+    if (net.contrastive && args.threads > net.batch / 2) args.threads = net.batch / 2;
     if (net.track) {
         args.track = net.track;
         args.augment_speed = net.augment_speed;
@@ -245,7 +245,6 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     }
     //printf(" imgs = %d \n", imgs);
 
-    pthread_t load_thread = load_data(args);
     pthread_t cc_launch;
     int isccinit = 0;
     int count = 0;
@@ -257,6 +256,20 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     int ccstep = net.cc_launch_epochs > 0 ? net.cc_launch_epochs * oneEpochIterations : net.cc_launch_iterations;
     int nextcc = *net.cur_iteration + ccstep;
     int nextsl = *net.cur_iteration + slstep;
+
+    list* noise_paths_list = NULL;
+
+    if (net.noise_file && net.noise_file[0] != '\0' && fexists(net.noise_file)) {
+        list* noise_paths_list = get_paths(net.noise_file);
+        args.noise_paths = (char**)list_to_array(noise_paths_list);
+        args.noise_paths_count = noise_paths_list->size;
+        args.noise_prob = net.noise_prob;
+        args.noise_min = net.noise_min;
+        args.noise_max = net.noise_max;
+        printf("Noise lost loaded. Images: %d \n", noise_paths_list->size);
+    }
+
+    pthread_t load_thread = load_data(args);
 
     int ci = get_current_iteration(net);
     if (ci > nextmap) nextmap = floor(ci / nextmap) * net.map_calc_iterations;
@@ -374,6 +387,16 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             pthread_join(load_thread, 0);
             train = buffer;
             free_data(train);
+
+            if (noise_paths_list && noise_paths_list->size > 0) {
+                free(args.noise_paths);
+                args.noise_paths = (char**)list_to_array(noise_paths_list);
+                args.noise_paths_count = noise_paths_list->size;
+                args.noise_prob = net.noise_prob;
+                args.noise_min = net.noise_min;
+                args.noise_max = net.noise_max;
+            }
+
             load_thread = load_data(args);
 
             for (k = 0; k < ngpus; ++k) {
@@ -390,6 +413,16 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             printf(" sequential_subdivisions = %d, sequence = %d \n", net.sequential_subdivisions, get_sequence_value(net));
         }
         // printf("args.paths[0] %s", args.paths[0]);
+
+
+        if (noise_paths_list && noise_paths_list->size > 0) {
+            free(args.noise_paths);
+            args.noise_paths = (char**)list_to_array(noise_paths_list);
+            args.noise_paths_count = noise_paths_list->size;
+            args.noise_prob = net.noise_prob;
+            args.noise_min = net.noise_min;
+            args.noise_max = net.noise_max;
+        }
 
         load_thread = load_data(args);
 
@@ -520,7 +553,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             float cur_con_acc = -1;
             for (k = 0; k < net.n; ++k)
                 if (net.layers[k].type == CONTRASTIVE) cur_con_acc = *net.layers[k].loss;
-            if (cur_con_acc >= 0) avg_contrastive_acc = avg_contrastive_acc*0.99 + cur_con_acc * 0.01;
+            if (cur_con_acc >= 0) avg_contrastive_acc = avg_contrastive_acc * 0.99 + cur_con_acc * 0.01;
             printf("  avg_contrastive_acc = %f \n", avg_contrastive_acc);
         }
         draw_train_loss(windows_name, img, img_size, avg_loss, max_img_loss, iteration, net.max_batches, mean_average_precision, draw_precision, "mAP%", avg_contrastive_acc / 100, dont_show, mjpeg_port, avg_time);
