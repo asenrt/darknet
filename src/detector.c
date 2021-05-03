@@ -224,7 +224,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 #ifdef OPENCV
     //int num_threads = get_num_threads();
     //if(num_threads > 2) args.threads = get_num_threads() - 2;
-    args.threads = 1;// 6 * ngpus;   // 3 for - Amazon EC2 Tesla V100: p3.2xlarge (8 logical cores) - p3.16xlarge
+    args.threads = 6 * ngpus;   // 3 for - Amazon EC2 Tesla V100: p3.2xlarge (8 logical cores) - p3.16xlarge
     //args.threads = 12 * ngpus;    // Ryzen 7 2700X (16 logical cores)
     mat_cv* img = NULL;
     float max_img_loss = net.max_chart_loss;
@@ -260,7 +260,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     list* noise_paths_list = NULL;
 
     if (net.noise_file && net.noise_file[0] != '\0' && fexists(net.noise_file)) {
-        list* noise_paths_list = get_paths(net.noise_file);
+        noise_paths_list = get_paths(net.noise_file);
         args.noise_paths = (char**)list_to_array(noise_paths_list);
         args.noise_paths_count = noise_paths_list->size;
         args.noise_prob = net.noise_prob;

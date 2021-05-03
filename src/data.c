@@ -1329,22 +1329,16 @@ data load_data_detection(load_args a)
             }
 
             // Overlay with alpha noise images
-            if (a.noise_paths) {
-                char** rdm_noise_paths = get_random_paths_custom(a.noise_paths, a.n, a.noise_paths_count, 0);
-                if (random_float() < a.noise_prob) {
-                    const char* nf = rdm_noise_paths[i];
-                    image slice = make_empty_image(a.w, a.h, a.c);
-                    slice.data = d.X.vals[i];
-                    save_image(slice, "slice");
-                    overlay_noise(nf, rand_uniform_strong(a.noise_min, a.noise_max), slice);
-                    save_image(slice, "slice-w-noise");
-                    d.X.vals[i] = slice.data;
-                }
+            if (a.noise_paths != NULL && random_float() < a.noise_prob) {
+                int noiseIdx = rand_int(0, a.noise_paths_count-1);
+                image slice = make_empty_image(a.w, a.h, a.c);
+                char* noiseFile = a.noise_paths[noiseIdx];
+                slice.data = d.X.vals[i];
+                //save_image(slice, "slice");
+                overlay_noise(noiseFile, rand_uniform_strong(a.noise_min, a.noise_max), slice);
+                //save_image(slice, "slice-w-noise");
+                d.X.vals[i] = slice.data;
             }
-
-            image tmp_ai = copy_image(ai);
-            wait_until_press_key_cv();
-            free_image(tmp_ai);
 
             if (a.show_imgs && i_mixup == use_mixup)   // delete i_mixup
             {
