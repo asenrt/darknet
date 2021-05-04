@@ -1329,7 +1329,10 @@ data load_data_detection(load_args a)
             }
 
             // Overlay with alpha noise images
-            if (a.noise_paths != NULL && random_float() < a.noise_prob) {
+
+            int add_noise = i_mixup == 0 && use_mixup == 0 || i_mixup == 3 && use_mixup == 3;
+
+            if (a.noise_paths != NULL && add_noise && random_float() < a.noise_prob) {
                 int noiseIdx = rand_int(0, a.noise_paths_count-1);
                 image slice = make_empty_image(a.w, a.h, a.c);
                 char* noiseFile = a.noise_paths[noiseIdx];
