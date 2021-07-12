@@ -287,6 +287,20 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         printf("\n");
         //printf(KNRM);
 
+        // Read the cc_launch_output
+        if (get_current_iteration(net) % 10 == 0 &&
+            net.cc_launch_output_file &&
+            net.cc_launch_output_file[0] != '\0' &&
+            fexists(net.cc_launch_output_file)) {
+            printf("Reading out file");
+            list* ccout = read_data_cfg(net.cc_launch_output_file);
+            float newLr = option_find_float(ccout, "lr", -1);
+            if (newLr > 0) {
+                net.learning_rate = newLr;
+                printf("New LR: %f \n", newLr);
+            }
+        }
+
         // Launch external program 
         if (*net.cur_iteration >= nextsl && net.sl_external_proc_cmd != NULL && net.sl_external_proc_cmd[0] != '\0') {
             nextsl += slstep;
@@ -587,7 +601,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             }
         }
         free_data(train);
-    }
+        }
 #ifdef GPU
     if (ngpus != 1) sync_nets(nets, ngpus, 0);
 #endif
@@ -623,7 +637,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         net_map.n = 0;
         free_network(net_map);
     }
-}
+    }
 
 static int get_coco_image_id(char* filename)
 {
