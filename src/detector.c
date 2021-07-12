@@ -542,6 +542,8 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 
             copy_weights_net(net, &net_map);
 
+            net_map.cur_iteration = net.cur_iteration;
+
             // combine Training and Validation networks
             //network net_combined = combine_train_valid_networks(net, net_map);
 
