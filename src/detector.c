@@ -1467,11 +1467,11 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
 
     FILE* map_file = NULL;
 
-    if (net.map_report_file &&
-        net.map_report_file[0] != '\0' &&
-        fexists(net.map_report_file)) {
+    if (net.map_report_file && net.map_report_file[0] != '\0') {
         printf("Saving map report \n");
-        map_file = fopen(net.map_report_file, "w");
+        map_file = fopen(net.map_report_file, "ab");
+        int ci = get_current_iteration(net);
+        fprintf(map_file, "\nIteration %d \n", ci);
     }
 
     for (i = 0; i < classes; ++i) {
@@ -1543,14 +1543,14 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     const float f1_score = 2.F * cur_precision * cur_recall / (cur_precision + cur_recall);
 
     if (map_file != NULL)
-        fprintf(map_file, "\n for conf_thresh = %1.2f, precision = %1.2f, recall = %1.2f, F1-score = %1.2f \n",
+        fprintf(map_file, "conf_thresh = %1.2f, precision = %1.2f, recall = %1.2f, F1-score = %1.2f \n",
             thresh_calc_avg_iou, cur_precision, cur_recall, f1_score);
 
     printf("\n for conf_thresh = %1.2f, precision = %1.2f, recall = %1.2f, F1-score = %1.2f \n",
         thresh_calc_avg_iou, cur_precision, cur_recall, f1_score);
 
     if (map_file != NULL)
-        fprintf(map_file, "\n for conf_thresh = %0.2f, TP = %d, FP = %d, FN = %d, average IoU = %2.2f %% \n",
+        fprintf(map_file, "conf_thresh = %0.2f, TP = %d, FP = %d, FN = %d, average IoU = %2.2f %% \n",
             thresh_calc_avg_iou, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, avg_iou * 100);
 
     printf(" for conf_thresh = %0.2f, TP = %d, FP = %d, FN = %d, average IoU = %2.2f %% \n",
@@ -1558,14 +1558,14 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
 
     mean_average_precision = mean_average_precision / classes;
 
-    if (map_file != NULL) fprintf(map_file, "\n IoU threshold = %2.0f %%, ", iou_thresh * 100);
+    if (map_file != NULL) fprintf(map_file, "IoU threshold = %2.0f %%, ", iou_thresh * 100);
 
     printf("\n IoU threshold = %2.0f %%, ", iou_thresh * 100);
     if (map_points) printf("used %d Recall-points \n", map_points);
     else printf("used Area-Under-Curve for each unique Recall \n");
 
     if (map_file != NULL)
-        fprintf(map_file, "\n mean average precision (mAP@%0.2f) = %f, or %2.2f %% \n", iou_thresh, mean_average_precision, mean_average_precision * 100);
+        fprintf(map_file, "mAP@%0.2f = %f, or %2.2f %% \n", iou_thresh, mean_average_precision, mean_average_precision * 100);
 
     printf(" mean average precision (mAP@%0.2f) = %f, or %2.2f %% \n", iou_thresh, mean_average_precision, mean_average_precision * 100);
 
