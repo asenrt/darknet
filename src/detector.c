@@ -1536,7 +1536,7 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
 
         if (map_file != NULL) {
             // iteration, cid, name, ap, tp, fp
-            fprintf(map_file, "%d, %d, %s, %2.2f, %d, %d, 0, 0, 0, 0, 0, 0, 0, 0, 0",
+            fprintf(map_file, "%d, %d, %s, %2.2f, %d, %d, 0, 0, 0, 0, 0, 0, 0, 0, 0\n",
                 ci, i, names[i], avg_precision, tp_for_thresh_per_class[i], fp_for_thresh_per_class[i]);
         }
 
@@ -1563,7 +1563,7 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     mean_average_precision = mean_average_precision / classes;
 
     if (map_file != NULL) {
-        fprintf(map_file, "\n%d, 0, 0, 0, 0, 0, %1.2f, %1.2f, %1.2f, %1.2f, %d, %d, %d, %f, %2.3f\n",
+        fprintf(map_file, "%d, 0, 0, 0, 0, 0, %1.2f, %1.2f, %1.2f, %1.2f, %d, %d, %d, %f, %2.3f\n",
             ci, thresh_calc_avg_iou, cur_precision, cur_recall, f1_score, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, iou_thresh, mean_average_precision);
     }
 
