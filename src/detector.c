@@ -601,7 +601,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             }
         }
         free_data(train);
-        }
+    }
 #ifdef GPU
     if (ngpus != 1) sync_nets(nets, ngpus, 0);
 #endif
@@ -637,7 +637,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         net_map.n = 0;
         free_network(net_map);
     }
-    }
+}
 
 static int get_coco_image_id(char* filename)
 {
@@ -1465,6 +1465,15 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
 
     double mean_average_precision = 0;
 
+    FILE* map_file = NULL;
+
+    if (net.map_report_file &&
+        net.map_report_file[0] != '\0' &&
+        fexists(net.map_report_file)) {
+        printf("Saving map report \n");
+        map_file = fopen(net.map_report_file, "w");
+    }
+
     for (i = 0; i < classes; ++i) {
         double avg_precision = 0;
 
@@ -1515,6 +1524,10 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
             avg_precision = avg_precision / map_points;
         }
 
+        if (map_file != NULL)
+            fprintf(map_file, "class_id = %d, name = %s, ap = %2.2f%%   \t (TP = %d, FP = %d) \n",
+                i, names[i], avg_precision * 100, tp_for_thresh_per_class[i], fp_for_thresh_per_class[i]);
+
         printf("class_id = %d, name = %s, ap = %2.2f%%   \t (TP = %d, FP = %d) \n",
             i, names[i], avg_precision * 100, tp_for_thresh_per_class[i], fp_for_thresh_per_class[i]);
 
@@ -1528,18 +1541,35 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     const float cur_precision = (float)tp_for_thresh / ((float)tp_for_thresh + (float)fp_for_thresh);
     const float cur_recall = (float)tp_for_thresh / ((float)tp_for_thresh + (float)(unique_truth_count - tp_for_thresh));
     const float f1_score = 2.F * cur_precision * cur_recall / (cur_precision + cur_recall);
+
+    if (map_file != NULL)
+        fprintf(map_file, "\n for conf_thresh = %1.2f, precision = %1.2f, recall = %1.2f, F1-score = %1.2f \n",
+            thresh_calc_avg_iou, cur_precision, cur_recall, f1_score);
+
     printf("\n for conf_thresh = %1.2f, precision = %1.2f, recall = %1.2f, F1-score = %1.2f \n",
         thresh_calc_avg_iou, cur_precision, cur_recall, f1_score);
+
+    if (map_file != NULL)
+        fprintf(map_file, "\n for conf_thresh = %0.2f, TP = %d, FP = %d, FN = %d, average IoU = %2.2f %% \n",
+            thresh_calc_avg_iou, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, avg_iou * 100);
 
     printf(" for conf_thresh = %0.2f, TP = %d, FP = %d, FN = %d, average IoU = %2.2f %% \n",
         thresh_calc_avg_iou, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, avg_iou * 100);
 
     mean_average_precision = mean_average_precision / classes;
+
+    if (map_file != NULL) fprintf(map_file, "\n IoU threshold = %2.0f %%, ", iou_thresh * 100);
+
     printf("\n IoU threshold = %2.0f %%, ", iou_thresh * 100);
     if (map_points) printf("used %d Recall-points \n", map_points);
     else printf("used Area-Under-Curve for each unique Recall \n");
 
+    if (map_file != NULL)
+        fprintf(map_file, "\n mean average precision (mAP@%0.2f) = %f, or %2.2f %% \n", iou_thresh, mean_average_precision, mean_average_precision * 100);
+
     printf(" mean average precision (mAP@%0.2f) = %f, or %2.2f %% \n", iou_thresh, mean_average_precision, mean_average_precision * 100);
+
+    if (map_file != NULL) fclose(map_file);
 
     for (i = 0; i < classes; ++i) {
         free(pr[i]);

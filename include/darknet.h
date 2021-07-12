@@ -741,6 +741,7 @@ typedef struct network {
     float rt_min_lrup;
     float rt_damp;
     int map_calc_iterations; // calculates map aever n iterations
+    char* map_report_file; // A file to dump all map reuslts
     int cc_launch_epochs; // This overrides cc_launch_iterations if cc_launch_epochs > 0
     int sl_launch_iterations; // launches external process at iteration mod this value
     char* sl_external_proc_cmd; // the program to run

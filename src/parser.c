@@ -1256,6 +1256,10 @@ void parse_net_options(list *options, network *net)
     net->noise_file = malloc(strlen(noise_paths) + 1);
     strcpy(net->noise_file, noise_paths);
 
+    char* map_report_file = option_find_str(options, "map_report_file", "");
+    net->map_report_file = malloc(strlen(map_report_file) + 1);
+    strcpy(net->map_report_file, map_report_file);
+
     net->noise_prob = option_find_float_quiet(options, "noise_prob", 0.0f);
     net->noise_min = option_find_float_quiet(options, "noise_min", 0.05f);
     net->noise_max = option_find_float_quiet(options, "noise_max", 0.5f);
