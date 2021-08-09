@@ -1681,7 +1681,7 @@ image *visualize_convolutional_layer(convolutional_layer l, char *window, image 
     image delta = get_convolutional_image(l);
     image dc = collapse_image_layers(delta, 1);
     char buff[256];
-    sprintf(buff, "%s: Output", window);
+    sprintf(buff, "%s_out", window);
     show_image(dc, buff);
     //save_image(dc, buff);
     free_image(dc);

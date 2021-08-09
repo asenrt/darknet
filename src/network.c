@@ -754,13 +754,13 @@ image get_network_image(network net)
     return def;
 }
 
-void visualize_network(network net)
+void visualize_network(network net, char * saveAt)
 {
     image *prev = 0;
     int i;
-    char buff[256];
+    char buff[1024];
     for(i = 0; i < net.n; ++i){
-        sprintf(buff, "Layer %d", i);
+        sprintf(buff, "%sLayer_%d",saveAt,  i);
         layer l = net.layers[i];
         if(l.type == CONVOLUTIONAL){
             prev = visualize_convolutional_layer(l, buff, prev);
