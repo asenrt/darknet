@@ -255,7 +255,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     int slstep = net.sl_launch_iterations; // Syncronous launch every n iterations
     int ccstep = net.cc_launch_epochs > 0 ? net.cc_launch_epochs * oneEpochIterations : net.cc_launch_iterations;
     int nextcc = *net.cur_iteration + ccstep;
-    int nextsl = *net.cur_iteration + slstep;
+    int nextsl = net.sl_launch_iterations;
 
     list* noise_paths_list = NULL;
 
@@ -273,6 +273,8 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
 
     int ci = get_current_iteration(net);
     if (ci > nextmap) nextmap = floor(ci / nextmap) * net.map_calc_iterations;
+    if (ci > net.sl_launch_iterations) nextsl = floor(ci / net.sl_launch_iterations) * net.sl_launch_iterations;
+
 
     // Delete the out file
     if (net.cc_launch_output_file && net.cc_launch_output_file[0] != '\0') remove(net.cc_launch_output_file);
