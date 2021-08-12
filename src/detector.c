@@ -252,6 +252,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     double time_remaining, avg_time = -1, alpha_time = 0.01;
     int oneEpochIterations = train_images_num / net.batch;
     int ccLaunchesCount = 0;
+    int slLaunchesCount = 0;
     int slstep = net.sl_launch_iterations; // Syncronous launch every n iterations
     int ccstep = net.cc_launch_epochs > 0 ? net.cc_launch_epochs * oneEpochIterations : net.cc_launch_iterations;
     int nextcc = *net.cur_iteration + ccstep;
@@ -306,7 +307,16 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         // Launch external program 
         if (*net.cur_iteration >= nextsl && net.sl_external_proc_cmd != NULL && net.sl_external_proc_cmd[0] != '\0') {
             nextsl += slstep;
-            launchExternalProc(net.sl_external_proc_cmd);
+            slLaunchesCount++;
+
+            // Make the lauch command and launch
+            char* cmdline = malloc(sizeof(char) * 1024);
+            char* pos = cmdline;
+            pos += sprintf(cmdline, net.sl_external_proc_cmd);
+            pos += sprintf(pos, " -ITERATION %d", *net.cur_iteration);
+            pos += sprintf(pos, " -LAUNCH %d", slLaunchesCount);
+
+            launchExternalProc(cmdline);
         }
 
         // Start cc_external_proc_cmd in a new thread
@@ -1470,7 +1480,7 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     double mean_average_precision = 0;
 
     FILE* map_file = NULL;
-    int ci = get_current_iteration(net);
+    const int ci = get_current_iteration(net);
 
     if (net.map_report_file && net.map_report_file[0] != '\0') {
         printf("Saving map report \n");
