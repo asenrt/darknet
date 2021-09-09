@@ -147,21 +147,14 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
     double start, time_remaining, avg_time = -1, alpha_time = 0.01;
     start = what_time_is_it_now();
 
-    int oneEpochIterations = train_images_num / net.batch;
-
     while(get_current_batch(net) < net.max_batches || net.max_batches == 0){
         time=clock();
-
-        float epoch = *net.cur_iteration / (float)oneEpochIterations;
-        //printf(KCYN);
-        printf("  EPOCH: %f 1e = %di\n", epoch, oneEpochIterations);
-        printf(" IMAGES: %d \n", net.train_images_num);
 
         pthread_join(load_thread, 0);
         train = buffer;
         load_thread = load_data(args);
 
-        //printf("Loaded: %lf seconds\n", sec(clock()-time));
+        printf("Loaded: %lf seconds\n", sec(clock()-time));
         time=clock();
 
         float loss = 0;
@@ -215,18 +208,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
         if (avg_time < 0) avg_time = time_remaining;
         else avg_time = alpha_time * time_remaining + (1 -  alpha_time) * avg_time;
         start = what_time_is_it_now();
-
-        //printf("%d, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images, %f hours left\n", get_current_batch(net), (float)(*net.seen)/ train_images_num, loss, avg_loss, get_current_rate(net), sec(clock()-time), *net.seen, avg_time);
-
-        printf("\n");
-        printf("   ITER: %d \n", get_current_batch(net));
-        printf("  LRATE: %4.6f \n", get_current_rate(net));
-        printf("   LOSS: %4.4f \n", loss);
-        printf("   AVGL: %4.4f \n", avg_loss);
-        printf("    ETA: %4.2fh \n", avg_time);
-        printf(" TOPKAT: %d \n", calc_topk_for_each);
-
-
+        printf("%d, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images, %f hours left\n", get_current_batch(net), (float)(*net.seen)/ train_images_num, loss, avg_loss, get_current_rate(net), sec(clock()-time), *net.seen, avg_time);
 #ifdef OPENCV
         if (net.contrastive) {
             float cur_con_acc = -1;
@@ -239,7 +221,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
         if (!dontuse_opencv) draw_train_loss(windows_name, img, img_size, avg_loss, max_img_loss, i, net.max_batches, topk, draw_precision, topk_buff, avg_contrastive_acc / 100, dont_show, mjpeg_port, avg_time);
 #endif  // OPENCV
 
-        if (i >= (iter_save + 5000)) {
+        if (i >= (iter_save + 1000)) {
             iter_save = i;
 #ifdef GPU
             if (ngpus != 1) sync_nets(nets, ngpus, 0);
@@ -1069,7 +1051,7 @@ void threat_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_i
 
     int* indexes = (int*)xcalloc(top, sizeof(int));
 
-    if(!cap) error("Couldn't connect to webcam.\n");
+    if(!cap) error("Couldn't connect to webcam.", DARKNET_LOC);
     create_window_cv("Threat", 0, 512, 512);
     float fps = 0;
     int i;
@@ -1208,7 +1190,7 @@ void gun_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
 
     int* indexes = (int*)xcalloc(top, sizeof(int));
 
-    if(!cap) error("Couldn't connect to webcam.\n");
+    if(!cap) error("Couldn't connect to webcam.", DARKNET_LOC);
     cvNamedWindow("Threat Detection", CV_WINDOW_NORMAL);
     cvResizeWindow("Threat Detection", 512, 512);
     float fps = 0;
@@ -1292,7 +1274,7 @@ void demo_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_ind
 
     int* indexes = (int*)xcalloc(top, sizeof(int));
 
-    if(!cap) error("Couldn't connect to webcam.\n");
+    if(!cap) error("Couldn't connect to webcam.", DARKNET_LOC);
     if (!benchmark) create_window_cv("Classifier", 0, 512, 512);
     float fps = 0;
     int i;

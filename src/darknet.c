@@ -417,16 +417,15 @@ void denormalize_net(char *cfgfile, char *weightfile, char *outfile)
     save_weights(net, outfile);
 }
 
-void visualize(char *cfgfile, char *weightfile, char *savePath)
+void visualize(char *cfgfile, char *weightfile)
 {
     network net = parse_network_cfg(cfgfile);
     if(weightfile){
         load_weights(&net, weightfile);
     }
-    visualize_network(net, savePath);
-
+    visualize_network(net);
 #ifdef OPENCV
-//    wait_until_press_key_cv();
+    wait_until_press_key_cv();
 #endif
 }
 
@@ -550,7 +549,7 @@ int main(int argc, char **argv)
     } else if (0 == strcmp(argv[1], "partial")){
         partial(argv[2], argv[3], argv[4], atoi(argv[5]));
     } else if (0 == strcmp(argv[1], "visualize")){
-        visualize(argv[2], (argc > 3) ? argv[3] : 0, (argc > 4) ? argv[4] : "");
+        visualize(argv[2], (argc > 3) ? argv[3] : 0);
     } else if (0 == strcmp(argv[1], "imtest")){
         test_resize(argv[2]);
     } else {

@@ -67,7 +67,7 @@ void check_error(cudaError_t status)
 #ifdef WIN32
         getchar();
 #endif
-        error(buffer);
+        error(buffer, DARKNET_LOC);
     }
     if (status2 != cudaSuccess)
     {
@@ -78,7 +78,7 @@ void check_error(cudaError_t status)
 #ifdef WIN32
         getchar();
 #endif
-        error(buffer);
+        error(buffer, DARKNET_LOC);
     }
 }
 
@@ -123,8 +123,11 @@ cudaStream_t get_cuda_stream() {
     int i = cuda_get_device();
     if (!streamInit[i]) {
         printf("Create CUDA-stream - %d \n", i);
-        //cudaError_t status = cudaStreamCreate(&streamsArray[i], cudaStreamNonBlocking);
+#ifdef CUDNN
         cudaError_t status = cudaStreamCreateWithFlags(&streamsArray[i], cudaStreamNonBlocking);
+#else
+        cudaError_t status = cudaStreamCreate(&streamsArray[i]);
+#endif
         if (status != cudaSuccess) {
             printf(" cudaStreamCreate error: %d \n", status);
             const char *s = cudaGetErrorString(status);
@@ -199,7 +202,7 @@ void cudnn_check_error(cudnnStatus_t status)
 #ifdef WIN32
         getchar();
 #endif
-        error(buffer);
+        error(buffer, DARKNET_LOC);
     }
     if (status2 != CUDNN_STATUS_SUCCESS)
     {
@@ -210,7 +213,7 @@ void cudnn_check_error(cudnnStatus_t status)
 #ifdef WIN32
         getchar();
 #endif
-        error(buffer);
+        error(buffer, DARKNET_LOC);
     }
 }
 
@@ -236,6 +239,35 @@ static int switchCudnnInit[16];
 #endif
 
 
+void cublas_check_error(cublasStatus_t status)
+{
+#if defined(DEBUG) || defined(CUDA_DEBUG)
+    cudaDeviceSynchronize();
+#endif
+    if (cuda_debug_sync) {
+        cudaDeviceSynchronize();
+    }
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        printf("cuBLAS Error\n");
+    }
+}
+
+void cublas_check_error_extended(cublasStatus_t status, const char *file, int line, const char *date_time)
+{
+    if (status != CUBLAS_STATUS_SUCCESS) {
+      printf("\n cuBLAS status Error in: file: %s() : line: %d : build time: %s \n", file, line, date_time);
+    }
+#if defined(DEBUG) || defined(CUDA_DEBUG)
+    cuda_debug_sync = 1;
+#endif
+    if (cuda_debug_sync) {
+        cudaError_t status = cudaDeviceSynchronize();
+      if (status != CUDA_SUCCESS)
+          printf("\n cudaError_t status = cudaDeviceSynchronize() Error in: file: %s() : line: %d : build time: %s \n", file, line, date_time);
+    }
+    cublas_check_error(status);
+}
+
 static int blasInit[16] = { 0 };
 static cublasHandle_t blasHandle[16];
 
@@ -243,9 +275,9 @@ cublasHandle_t blas_handle()
 {
     int i = cuda_get_device();
     if (!blasInit[i]) {
-        cublasCreate(&blasHandle[i]);
+        CHECK_CUBLAS(cublasCreate(&blasHandle[i]));
         cublasStatus_t status = cublasSetStream(blasHandle[i], get_cuda_stream());
-        CHECK_CUDA((cudaError_t)status);
+        CHECK_CUBLAS(status);
         blasInit[i] = 1;
     }
     return blasHandle[i];
@@ -309,7 +341,7 @@ static volatile int event_counter = 0;
 
 void wait_stream(int i) {
     int dev_id = cuda_get_device();
-    if (event_counter >= max_events) error("CUDA max_events exceeded \n");
+    if (event_counter >= max_events) error("CUDA max_events exceeded", DARKNET_LOC);
 
     CHECK_CUDA( cudaEventCreateWithFlags(&switchEventsArray[event_counter], cudaEventDisableTiming) );
     //printf(" create event = %d (wait for stream = %d) \n", event_counter, i);
@@ -359,7 +391,7 @@ void pre_allocate_pinned_memory(const size_t size)
     pthread_mutex_lock(&mutex_pinned);
     if (!pinned_ptr) {
         pinned_ptr = (float **)calloc(num_of_blocks, sizeof(float *));
-        if(!pinned_ptr) error("calloc failed in pre_allocate() \n");
+        if(!pinned_ptr) error("calloc failed in pre_allocate()", DARKNET_LOC);
 
         printf("pre_allocate: size = %Iu MB, num_of_blocks = %Iu, block_size = %Iu MB \n",
             size / (1024*1024), num_of_blocks, pinned_block_size / (1024 * 1024));
@@ -369,7 +401,7 @@ void pre_allocate_pinned_memory(const size_t size)
             cudaError_t status = cudaHostAlloc((void **)&pinned_ptr[k], pinned_block_size, cudaHostRegisterMapped);
             if (status != cudaSuccess) fprintf(stderr, " Can't pre-allocate CUDA-pinned buffer on CPU-RAM \n");
             CHECK_CUDA(status);
-            if (!pinned_ptr[k]) error("cudaHostAlloc failed\n");
+            if (!pinned_ptr[k]) error("cudaHostAlloc failed", DARKNET_LOC);
             else {
                 printf(" Allocated %d pinned block \n", pinned_block_size);
             }
@@ -446,7 +478,7 @@ float *cuda_make_array_pinned(float *x, size_t n)
         status = cudaMemcpyAsync(x_gpu, x, size, cudaMemcpyDefault, get_cuda_stream());
         CHECK_CUDA(status);
     }
-    if (!x_gpu) error("cudaHostAlloc failed\n");
+    if (!x_gpu) error("cudaHostAlloc failed", DARKNET_LOC);
     return x_gpu;
 }
 
@@ -464,7 +496,7 @@ float *cuda_make_array(float *x, size_t n)
         status = cudaMemcpyAsync(x_gpu, x, size, cudaMemcpyDefault, get_cuda_stream());
         CHECK_CUDA(status);
     }
-    if(!x_gpu) error("Cuda malloc failed\n");
+    if(!x_gpu) error("Cuda malloc failed", DARKNET_LOC);
     return x_gpu;
 }
 
@@ -479,7 +511,7 @@ void **cuda_make_array_pointers(void **x, size_t n)
         status = cudaMemcpyAsync(x_gpu, x, size, cudaMemcpyDefault, get_cuda_stream());
         CHECK_CUDA(status);
     }
-    if (!x_gpu) error("Cuda malloc failed\n");
+    if (!x_gpu) error("Cuda malloc failed", DARKNET_LOC);
     return x_gpu;
 }
 
@@ -531,7 +563,7 @@ int *cuda_make_int_array_new_api(int *x, size_t n)
         cudaError_t status = cudaMemcpyAsync(x_gpu, x, size, cudaMemcpyHostToDevice, get_cuda_stream());
         CHECK_CUDA(status);
 	}
-	if (!x_gpu) error("Cuda malloc failed\n");
+	if (!x_gpu) error("Cuda malloc failed", DARKNET_LOC);
 	return x_gpu;
 }
 

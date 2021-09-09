@@ -241,7 +241,7 @@ void cudnn_convolutional_setup(layer *l, int cudnn_preference, size_t workspace_
 #endif
 #else   //if(CUDNN_MAJOR >= 7)
     if (l->groups > 1) {
-        error("CUDNN < 7 doesn't support groups, please upgrade!");
+        error("CUDNN < 7 doesn't support groups, please upgrade!", DARKNET_LOC);
     }
 #endif
 
@@ -1681,7 +1681,7 @@ image *visualize_convolutional_layer(convolutional_layer l, char *window, image 
     image delta = get_convolutional_image(l);
     image dc = collapse_image_layers(delta, 1);
     char buff[256];
-    sprintf(buff, "%s_out", window);
+    sprintf(buff, "%s: Output", window);
     show_image(dc, buff);
     //save_image(dc, buff);
     free_image(dc);

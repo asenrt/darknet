@@ -192,7 +192,8 @@ typedef enum {
     L2NORM,
     EMPTY,
     BLANK,
-    CONTRASTIVE
+    CONTRASTIVE,
+    IMPLICIT
 } LAYER_TYPE;
 
 // layer.h
@@ -696,7 +697,7 @@ struct layer {
 
 // network.h
 typedef enum {
-    CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM, SGDR, RTSIN, RTLOCK
+    CONSTANT, STEP, EXP, POLY, STEPS, SIG, RANDOM, SGDR
 } learning_rate_policy;
 
 // network.h
@@ -735,25 +736,6 @@ typedef struct network {
     float gamma;
     float scale;
     float power;
-    float rt_lock_low_exp;
-    float rt_lock_upp_exp;
-    float rt_min_lr;
-    float rt_min_lrup;
-    float rt_damp;
-    int map_calc_iterations; // calculates map aever n iterations
-    char* map_report_file; // A file to dump all map reuslts
-    int cc_launch_epochs; // This overrides cc_launch_iterations if cc_launch_epochs > 0
-    int sl_launch_iterations; // launches external process at iteration mod this value
-    char* sl_external_proc_cmd; // the program to run
-    int cc_launch_iterations; // launches in separate thread
-    char* cc_external_proc_cmd; // the cc program to run
-    char* cc_launch_output_file; // A txt file used as a comminication between the cc_program and darknet
-    char* noise_file; // A txt file with the paths of the alpha transparent noise overlays
-    float noise_prob; // Prob of adding noise
-    float noise_min; // Opacity range from 
-    float noise_max; // Opacity range to
-
-
     int time_steps;
     int step;
     int max_batches;
@@ -788,7 +770,7 @@ typedef struct network {
     float label_smooth_eps;
     int resize_step;
     int attention;
-    int adversarial;    
+    int adversarial;
     float adversarial_lr;
     float max_chart_loss;
     int letter_box;
@@ -839,7 +821,7 @@ typedef struct network {
     size_t *max_input16_size;
     size_t *max_output16_size;
     int wait_stream;
-    
+
     void *cuda_graph;
     void *cuda_graph_exec;
     int use_cuda_graph;
@@ -917,6 +899,7 @@ typedef struct ious {
 typedef struct detection{
     box bbox;
     int classes;
+    int best_class_idx;
     float *prob;
     float *mask;
     float objectness;
@@ -926,7 +909,7 @@ typedef struct detection{
     float *embeddings;  // embeddings for tracking
     int embedding_size;
     float sim;
-    int track_id;    
+    int track_id;
 } detection;
 
 // network.c -batch inference
@@ -959,11 +942,6 @@ typedef enum {
 // data.h
 typedef struct load_args {
     int threads;
-    char **noise_paths;
-    int noise_paths_count;
-    float noise_prob;
-    float noise_min;
-    float noise_max;
     char **paths;
     char *path;
     int n;
@@ -1040,7 +1018,6 @@ typedef struct box_label {
 // parser.c
 LIB_API network *load_network(char *cfg, char *weights, int clear);
 LIB_API network *load_network_custom(char *cfg, char *weights, int clear, int batch);
-LIB_API network *load_network(char *cfg, char *weights, int clear);
 LIB_API void free_network(network net);
 LIB_API void free_network_ptr(network* net);
 
@@ -1070,7 +1047,7 @@ LIB_API void reset_rnn(network *net);
 LIB_API float *network_predict_image(network *net, image im);
 LIB_API float *network_predict_image_letterbox(network *net, image im);
 LIB_API float validate_detector_map(char *datacfg, char *cfgfile, char *weightfile, float thresh_calc_avg_iou, const float iou_thresh, const int map_points, int letter_box, network *existing_net);
-LIB_API void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear, int dont_show, int calc_map, int mjpeg_port, int show_imgs, int benchmark_layers, char* chart_path);
+LIB_API void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear, int dont_show, int calc_map, float thresh, float iou_thresh, int mjpeg_port, int show_imgs, int benchmark_layers, char* chart_path);
 LIB_API void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh,
     float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile, int letter_box, int benchmark_layers);
 LIB_API int network_width(network *net);
@@ -1079,7 +1056,7 @@ LIB_API void optimize_picture(network *net, image orig, int max_layer, float sca
 
 // image.h
 LIB_API void make_image_red(image im);
-LIB_API image make_attention_image(int img_size, float *original_delta_cpu, float *original_input_cpu, int w, int h, int c);
+LIB_API image make_attention_image(int img_size, float *original_delta_cpu, float *original_input_cpu, int w, int h, int c, float alpha);
 LIB_API image resize_image(image im, int w, int h);
 LIB_API void quantize_image(image im);
 LIB_API void copy_image_from_bytes(image im, char *pdata);

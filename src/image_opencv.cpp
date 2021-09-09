@@ -140,7 +140,7 @@ cv::Mat load_image_mat(char *filename, int channels)
     else if (channels == 1) flag = cv::IMREAD_GRAYSCALE;
     else if (channels == 3) flag = cv::IMREAD_COLOR;
     else {
-        //fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
+        fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
     }
     //flag |= IMREAD_IGNORE_ORIENTATION;    // un-comment it if you want
 
@@ -378,6 +378,17 @@ extern "C" void resize_window_cv(char const* window_name, int width, int height)
 {
     try {
         cv::resizeWindow(window_name, width, height);
+    }
+    catch (...) {
+        cerr << "OpenCV exception: create_window_cv \n";
+    }
+}
+// ----------------------------------------
+
+extern "C" void move_window_cv(char const* window_name, int x, int y)
+{
+    try {
+        cv::moveWindow(window_name, x, y);
     }
     catch (...) {
         cerr << "OpenCV exception: create_window_cv \n";
@@ -833,6 +844,15 @@ extern "C" image get_image_from_stream_letterbox(cap_cv *cap, int w, int h, int 
     return im;
 }
 // ----------------------------------------
+
+extern "C" void consume_frame(cap_cv *cap){
+    cv::Mat *src = NULL;
+    src = (cv::Mat *)get_capture_frame_cv(cap);
+    if (src)
+        delete src;
+}
+// ----------------------------------------
+
 
 // ====================================================================
 // Image Saving
@@ -1324,47 +1344,6 @@ extern "C" void blend_images_cv(image new_img, float alpha, image old_img, float
     cv::Mat new_mat(cv::Size(new_img.w, new_img.h), CV_32FC(new_img.c), new_img.data);// , size_t step = AUTO_STEP)
     cv::Mat old_mat(cv::Size(old_img.w, old_img.h), CV_32FC(old_img.c), old_img.data);
     cv::addWeighted(new_mat, alpha, old_mat, beta, 0.0, new_mat);
-}
-
-extern "C" void overlay_noise(char* pngpath, float alpha, image jpg)
-{
-    cv::Mat noise = cv::imread(pngpath, -1);
-    cv::Mat noisePostFx;
-
-    // Rotate the noise at center
-    cv::Point2f center(noise.cols / 2., noise.rows / 2.);
-    double angle = rand_uniform_strong(0, 360);
-    cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
-    cv::warpAffine(noise, noise, r, noise.size());
-
-    // If the noise is smaller just take the whole image with resize
-    if(noise.rows <= jpg.h || noise.cols <= jpg.w)
-        cv::resize(noise, noisePostFx, cv::Size(jpg.w, jpg.h));
-    else {
-        // Crop with the ar of the destination at random point in the noise. No zoom
-        int wslack = noise.cols - jpg.w;
-        int hslack = noise.rows - jpg.h;
-        int cropx = rand_int(0, wslack-1);
-        int cropy = rand_int(0, hslack-1);
-
-        cv::Rect noiseCrop(cropx, cropy, jpg.w, jpg.h);
-        noisePostFx = noise(noiseCrop);
-    }
-
-    //cv::imwrite("noise.png", noise);
-    float beta = 1 - alpha;
-
-    // Now that noise mat is with the size of the destination - overlay.
-    for (int i = 0; i < jpg.h; i++) 
-        for (int j = 0; j < jpg.w; j++)
-            for(int c = 0; c < jpg.c; c++){
-                cv::Vec4b bytes = noisePostFx.at<cv::Vec4b>(i, j);
-                if (bytes[3] > 0) {
-                    int pos = c * jpg.h * jpg.w + i * jpg.w + j;
-                    int ic = 2 - c; // Swap R and B
-                    jpg.data[pos] = (beta * jpg.data[pos] + (alpha * noisePostFx.at<cv::Vec4b>(i, j)[ic]) / 255.0f);
-                }
-            }
 }
 
 // bilateralFilter bluring

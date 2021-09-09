@@ -149,33 +149,8 @@ float get_current_rate(network net)
             return rate;
         case EXP:
             return net.learning_rate * pow(net.gamma, batch_num);
-        case RTLOCK:
-        {
-            double low = max(net.learning_rate * pow(1.0 - ((double)batch_num / (double)net.max_batches), net.rt_lock_low_exp), net.rt_min_lr);
-            double upp = max(net.learning_rate * pow(1.0 - ((double)batch_num / (double)net.max_batches), net.rt_lock_upp_exp), net.rt_min_lrup);
-            double sinpart = sin(net.step * (double)batch_num * M_PI / (double)net.max_batches);
-            double lr = (abs(low + upp)/2.0) + (sinpart/(double)net.scale);
-
-            //printf("lrr %f, sinp %f, low %f, upp %f, batch %d, rtlow %f, rtupp %f, step %d, scale %d",
-            //    lr, sinpart, low, upp, batch_num, net.rt_lock_low_exp, net.rt_lock_upp_exp, net.step, net.scale);
-
-            if (lr > upp) lr = upp;
-            if (lr < low) lr = low;
-
-            return lr;
-        }
-        case RTSIN:
-        {
-            double base = net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
-            double prog = (double)batch_num / net.max_batches;
-            double decay = 1 - prog;
-            double damp = net.rt_damp - prog;
-            double lr = base - (decay * sin(damp * net.step * batch_num * M_PI / net.max_batches)) / net.scale;
-
-            return max(lr, net.rt_min_lr);
-        }
         case POLY:
-            return net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
+            return net.learning_rate * pow(1 - (float)batch_num / net.max_batches, net.power);
             //if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);
             //return net.learning_rate * pow(1 - (float)batch_num / net.max_batches, net.power);
         case RANDOM:
@@ -298,7 +273,7 @@ void forward_network(network net, network_state state)
     for(i = 0; i < net.n; ++i){
         state.index = i;
         layer l = net.layers[i];
-        if(l.delta && state.train){
+        if(l.delta && state.train && l.train){
             scal_cpu(l.outputs * l.batch, 0, l.delta, 1);
         }
         //double time = get_time_point();
@@ -322,6 +297,7 @@ void update_network(network net)
     float rate = get_current_rate(net);
     for(i = 0; i < net.n; ++i){
         layer l = net.layers[i];
+        if (l.train == 0) continue;
         if(l.update){
             l.update(l, update_batch, rate, net.momentum, net.decay);
         }
@@ -663,7 +639,7 @@ int resize_network(network *net, int w, int h)
             resize_cost_layer(&l, inputs);
         }else{
             fprintf(stderr, "Resizing type %d \n", (int)l.type);
-            error("Cannot resize this type of layer");
+            error("Cannot resize this type of layer", DARKNET_LOC);
         }
         if(l.workspace_size > workspace_size) workspace_size = l.workspace_size;
         inputs = l.outputs;
@@ -754,13 +730,13 @@ image get_network_image(network net)
     return def;
 }
 
-void visualize_network(network net, char * saveAt)
+void visualize_network(network net)
 {
     image *prev = 0;
     int i;
-    char buff[1024];
+    char buff[256];
     for(i = 0; i < net.n; ++i){
-        sprintf(buff, "%sLayer_%d",saveAt,  i);
+        sprintf(buff, "Layer %d", i);
         layer l = net.layers[i];
         if(l.type == CONVOLUTIONAL){
             prev = visualize_convolutional_layer(l, buff, prev);
@@ -909,7 +885,13 @@ void custom_get_region_detections(layer l, int w, int h, int net_w, int net_h, f
         dets[j].classes = l.classes;
         dets[j].bbox = boxes[j];
         dets[j].objectness = 1;
+        float highest_prob = 0;
+        dets[j].best_class_idx = -1;
         for (i = 0; i < l.classes; ++i) {
+            if (probs[j][i] > highest_prob) {
+            	highest_prob = probs[j][i];
+            	dets[j].best_class_idx = i;
+            }
             dets[j].prob[i] = probs[j][i];
         }
     }
@@ -1483,6 +1465,7 @@ void copy_weights_net(network net_train, network *net_map)
         }
         net_map->layers[k].batch = 1;
         net_map->layers[k].steps = 1;
+        net_map->layers[k].train = 0;
     }
 }
 
