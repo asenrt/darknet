@@ -280,6 +280,8 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
     // Delete the out file
     if (net.cc_launch_output_file && net.cc_launch_output_file[0] != '\0') remove(net.cc_launch_output_file);
 
+    printf("CI: %d \n", ci);
+
     while (get_current_iteration(net) < net.max_batches) {
         float epoch = *net.cur_iteration / (float)oneEpochIterations;
         //printf(KCYN);
@@ -615,7 +617,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             }
         }
         free_data(train);
-    }
+        }
 #ifdef GPU
     if (ngpus != 1) sync_nets(nets, ngpus, 0);
 #endif
@@ -651,7 +653,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
         net_map.n = 0;
         free_network(net_map);
     }
-}
+    }
 
 static int get_coco_image_id(char* filename)
 {
@@ -1169,7 +1171,8 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
         getchar();
     }
     srand(time(0));
-    printf("\n calculation mAP (mean average precision)...\n");
+    int __ci = (int)get_current_batch(net);
+    printf("\n calculation mAP (mean average precision) at %d\n", __ci);
 
     list* plist = get_paths(valid_images);
     char** paths = (char**)list_to_array(plist);
@@ -1480,15 +1483,15 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     double mean_average_precision = 0;
 
     FILE* map_file = NULL;
-    const int ci = get_current_iteration(net);
+    int ci = (int)get_current_iteration(net);
 
     if (net.map_report_file && net.map_report_file[0] != '\0') {
-        printf("Saving map report \n");
+        printf("Saving map report at %d \n", ci);
         int add_header = !fexists(net.map_report_file);
         map_file = fopen(net.map_report_file, "ab");
 
         if (add_header)
-            fprintf(map_file, "i, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map\n");
+            fprintf(map_file, "i, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map \n");
 
         // map report header
         // ci, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map
@@ -1548,7 +1551,7 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
 
         if (map_file != NULL) {
             // iteration, cid, name, ap, tp, fp
-            fprintf(map_file, "%d, %d, %s, %2.2f, %d, %d, 0, 0, 0, 0, 0, 0, 0, 0, 0\n",
+            fprintf(map_file, "%d, %d, %s, %2.2f, %d, %d, 0, 0, 0, 0, 0, 0, 0, 0, 0 \n",
                 ci, i, names[i], avg_precision, tp_for_thresh_per_class[i], fp_for_thresh_per_class[i]);
         }
 
@@ -1575,7 +1578,7 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     mean_average_precision = mean_average_precision / classes;
 
     if (map_file != NULL) {
-        fprintf(map_file, "%d, 0, 0, 0, 0, 0, %1.2f, %1.2f, %1.2f, %1.2f, %d, %d, %d, %f, %2.3f\n",
+        fprintf(map_file, "%d, 0, 0, 0, 0, 0, %1.2f, %1.2f, %1.2f, %1.2f, %d, %d, %d, %f, %2.3f \n",
             ci, thresh_calc_avg_iou, cur_precision, cur_recall, f1_score, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, iou_thresh, mean_average_precision);
     }
 
@@ -1585,7 +1588,10 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
 
     printf(" mean average precision (mAP@%0.2f) = %f, or %2.2f %% \n", iou_thresh, mean_average_precision, mean_average_precision * 100);
 
-    if (map_file != NULL) fclose(map_file);
+    if (map_file != NULL) {
+        fclose(map_file);
+        printf("Saved");
+    }
 
     for (i = 0; i < classes; ++i) {
         free(pr[i]);
