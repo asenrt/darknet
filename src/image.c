@@ -1057,12 +1057,16 @@ image random_crop_image(image im, int w, int h)
 
 image random_augment_image(image im, float angle, float aspect, int low, int high, int size)
 {
+    srand(time(0));
+
     aspect = rand_scale(aspect);
     int r = rand_int(low, high);
     int min = (im.h < im.w*aspect) ? im.h : im.w*aspect;
     float scale = (float)r / min;
+    float deg = rand_int(-angle, angle);
+    float rad = deg * M_PI / 180.;
 
-    float rad = rand_uniform(-angle, angle) * 2.0 * M_PI / 360.;
+    //printf("%f\n", deg);
 
     float dx = (im.w*scale/aspect - size) / 2.;
     float dy = (im.h*scale - size) / 2.;
