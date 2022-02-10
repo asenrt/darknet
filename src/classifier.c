@@ -155,7 +155,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
         float epoch = *net.cur_iteration / (float)oneEpochIterations;
         //printf(KCYN);
         printf("  EPOCH: %f 1e = %di\n", epoch, oneEpochIterations);
-        printf(" IMAGES: %d \n", net.train_images_num);
+        printf(" IMAGES: %d \n", train_images_num);
 
         pthread_join(load_thread, 0);
         train = buffer;
