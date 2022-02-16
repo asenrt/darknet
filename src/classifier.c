@@ -569,6 +569,19 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
     int m = plist->size;
     free_list(plist);
 
+    // Validation report csv
+    FILE* valid_csv = NULL;
+
+    if (net.map_report_file && net.map_report_file[0] != '\0') {
+        printf("Saving csv report \n");
+        int add_header = !fexists(net.map_report_file);
+        valid_csv = fopen(net.map_report_file, "ab");
+
+        if (add_header)
+            fprintf(valid_csv, "image, gt, inf, score, match, w, h,\n");
+    }
+
+
     float avg_acc = 0;
     float avg_topk = 0;
     int* indexes = (int*)xcalloc(topk, sizeof(int));
@@ -585,15 +598,13 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
         }
         image im = load_image_color(paths[i], 0, 0);
         image resized = resize_min(im, size);
-        resize_network(&net, resized.w, resized.h);
+        //resize_network(&net, resized.w, resized.h);
         //show_image(im, "orig");
         //show_image(crop, "cropped");
         //cvWaitKey(0);
         float *pred = network_predict(net, resized.data);
         if(net.hierarchy) hierarchy_predictions(pred, net.outputs, net.hierarchy, 1);
-
-        free_image(im);
-        free_image(resized);
+           
         top_k(pred, classes, topk, indexes);
 
         if(indexes[0] == class_id) avg_acc += 1;
@@ -601,9 +612,22 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
             if(indexes[j] == class_id) avg_topk += 1;
         }
 
+        if (valid_csv != NULL) {
+            int isMatch = labels[class_id] == labels[indexes[0]] ? 1 : 0;
+            fprintf(valid_csv, "%s, %s, %s, %f, %d, %d, %d\n",
+                paths[i], labels[class_id], labels[indexes[0]], pred[indexes[0]], isMatch, resized.w, resized.h);
+        }
+
         printf("%d: top 1: %f, top %d: %f\n", i, avg_acc/(i+1), topk, avg_topk/(i+1));
+        free_image(im);
+        free_image(resized); 
     }
     free(indexes);
+    if (valid_csv != NULL) {
+        fclose(valid_csv);
+        printf("Validation csv saved as %s", net.map_report_file);
+    }
+
 }
 
 
