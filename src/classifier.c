@@ -596,11 +596,12 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
                 break;
             }
         }
-        image im = load_image_color(paths[i], 0, 0);
-        image resized = resize_min(im, size);
+        //image im = load_image_color(paths[i], 0, 0);
+        image resized = load_image(paths[i], net.w, net.h, 3);
+        //image resized = resize_min(im, size);
         //resize_network(&net, resized.w, resized.h);
         //show_image(im, "orig");
-        //show_image(crop, "cropped");
+        //show_image(resized, "cropped");
         //cvWaitKey(0);
         float *pred = network_predict(net, resized.data);
         if(net.hierarchy) hierarchy_predictions(pred, net.outputs, net.hierarchy, 1);
@@ -619,7 +620,7 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
         }
 
         printf("%d: top 1: %f, top %d: %f\n", i, avg_acc/(i+1), topk, avg_topk/(i+1));
-        free_image(im);
+       // free_image(im);
         free_image(resized); 
     }
     free(indexes);
