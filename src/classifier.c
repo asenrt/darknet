@@ -121,6 +121,19 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
     args.labels = labels;
     args.type = CLASSIFICATION_DATA;
 
+
+    list* noise_paths_list = NULL;
+
+    if (net.noise_file && net.noise_file[0] != '\0' && fexists(net.noise_file)) {
+        noise_paths_list = get_paths(net.noise_file);
+        args.noise_paths = (char**)list_to_array(noise_paths_list);
+        args.noise_paths_count = noise_paths_list->size;
+        args.noise_prob = net.noise_prob;
+        args.noise_min = net.noise_min;
+        args.noise_max = net.noise_max;
+        printf("Noise lost loaded. Images: %d \n", noise_paths_list->size);
+    }
+
 #ifdef OPENCV
     //args.threads = 3;
     mat_cv* img = NULL;
