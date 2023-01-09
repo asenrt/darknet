@@ -1127,6 +1127,7 @@ route_layer parse_route(list *options, size_params params)
 
 learning_rate_policy get_policy(char *s)
 {
+    if (strcmp(s, "rtline") == 0) return RTLINE;
     if (strcmp(s, "rtsin") == 0) return RTSIN;
     if (strcmp(s, "rtlock") == 0) return RTLOCK;
     if (strcmp(s, "random")==0) return RANDOM;
@@ -1284,7 +1285,7 @@ void parse_net_options(list *options, network *net)
     if(net->policy == STEP){
         net->step = option_find_int(options, "step", 1);
         net->scale = option_find_float(options, "scale", 1);
-    } else if (net->policy == STEPS || net->policy == SGDR){
+    } else if (net->policy == STEPS || net->policy == SGDR || net->policy == RTLINE){
         char *l = option_find(options, "steps");
         char *p = option_find(options, "scales");
         char *s = option_find(options, "seq_scales");

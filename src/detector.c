@@ -317,6 +317,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             pos += sprintf(cmdline, net.sl_external_proc_cmd);
             pos += sprintf(pos, " -ITERATION %d", *net.cur_iteration);
             pos += sprintf(pos, " -LAUNCH %d", slLaunchesCount);
+            pos += sprintf(pos, " -mapLR %f", get_current_rate(net));
 
             launchExternalProc(cmdline);
         }
@@ -562,7 +563,7 @@ void train_detector(char* datacfg, char* cfgfile, char* weightfile, int* gpus, i
             //network net_combined = combine_train_valid_networks(net, net_map);
 
             iter_map = iteration;
-            mean_average_precision = validate_detector_map(datacfg, cfgfile, weightfile, 0.25, 0.5, 0, net.letter_box, &net_map);// &net_combined);
+            mean_average_precision = validate_detector_map(datacfg, cfgfile, weightfile, 0.25, 0.5, 0, net.letter_box, &net_map, get_current_rate(net));// &net_combined);
             printf("\n mean_average_precision (mAP@0.5) = %f \n", mean_average_precision);
             if (mean_average_precision > best_map) {
                 best_map = mean_average_precision;
@@ -1133,7 +1134,7 @@ int detections_comparator(const void* pa, const void* pb)
     return 0;
 }
 
-float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, float thresh_calc_avg_iou, const float iou_thresh, const int map_points, int letter_box, network* existing_net)
+float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, float thresh_calc_avg_iou, const float iou_thresh, const int map_points, int letter_box, network* existing_net, float lr)
 {
     int j;
     list* options = read_data_cfg(datacfg);
@@ -1491,10 +1492,10 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
         map_file = fopen(net.map_report_file, "ab");
 
         if (add_header)
-            fprintf(map_file, "i, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map \n");
+            fprintf(map_file, "i, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map, lr \n");
 
         // map report header
-        // ci, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map
+        // ci, cid, name, ap, tp, fp, conf, precision, recall, f1, TP, FP, FN, iou, map, lr
 
         //fprintf(map_file, "\nIteration %d \n", ci);
     }
@@ -1578,8 +1579,8 @@ float validate_detector_map(char* datacfg, char* cfgfile, char* weightfile, floa
     mean_average_precision = mean_average_precision / classes;
 
     if (map_file != NULL) {
-        fprintf(map_file, "%d, 0, 0, 0, 0, 0, %1.2f, %1.2f, %1.2f, %1.2f, %d, %d, %d, %f, %2.3f \n",
-            ci, thresh_calc_avg_iou, cur_precision, cur_recall, f1_score, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, iou_thresh, mean_average_precision);
+        fprintf(map_file, "%d, 0, 0, 0, 0, 0, %.4f, %.4f, %.4f, %.4f, %d, %d, %d, %f, %.4f, %.8f \n",
+            ci, thresh_calc_avg_iou, cur_precision, cur_recall, f1_score, tp_for_thresh, fp_for_thresh, unique_truth_count - tp_for_thresh, iou_thresh, mean_average_precision, lr);
     }
 
     printf("\n IoU threshold = %2.0f %%, ", iou_thresh * 100);
@@ -2217,6 +2218,8 @@ void run_detector(int argc, char** argv)
     int ext_output = find_arg(argc, argv, "-ext_output");
     int save_labels = find_arg(argc, argv, "-save_labels");
     char* chart_path = find_char_arg(argc, argv, "-chart", 0);
+    // Will be logged as the current LR at the moment of calculating the MAP
+    float mapLR = find_float_arg(argc, argv, "-mapLR", .0);
     if (argc < 4) {
         fprintf(stderr, "usage: %s %s [train/test/valid/demo/map] [data] [cfg] [weights (optional)]\n", argv[0], argv[1]);
         return;
@@ -2258,7 +2261,7 @@ void run_detector(int argc, char** argv)
     else if (0 == strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear, dont_show, calc_map, mjpeg_port, show_imgs, benchmark_layers, chart_path);
     else if (0 == strcmp(argv[2], "valid")) validate_detector(datacfg, cfg, weights, outfile);
     else if (0 == strcmp(argv[2], "recall")) validate_detector_recall(datacfg, cfg, weights);
-    else if (0 == strcmp(argv[2], "map")) validate_detector_map(datacfg, cfg, weights, thresh, iou_thresh, map_points, letter_box, NULL);
+    else if (0 == strcmp(argv[2], "map")) validate_detector_map(datacfg, cfg, weights, thresh, iou_thresh, map_points, letter_box, NULL, mapLR);
     else if (0 == strcmp(argv[2], "calc_anchors")) calc_anchors(datacfg, num_of_clusters, width, height, show);
     else if (0 == strcmp(argv[2], "draw")) {
         int it_num = 100;

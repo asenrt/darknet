@@ -174,6 +174,25 @@ float get_current_rate(network net)
 
             return max(lr, net.rt_min_lr);
         }
+        case RTLINE:
+        {
+            int cIter = get_current_iteration(net);
+            double lr, lr1, lr2 = 0;
+            int i1, i2, pIdx = 0;
+
+            while (net.steps[pIdx] < cIter) pIdx++;
+
+            pIdx--;
+
+            i1 = net.steps[pIdx];
+            i2 = net.steps[pIdx + 1];
+            lr1 = net.scales[pIdx];
+            lr2 = net.scales[pIdx + 1];
+
+            lr = (lr2 - lr1) * (cIter - i1) / (i2 - i1) + lr1;
+
+            return lr;
+        }
         case POLY:
             return net.learning_rate * pow(1 - (float)batch_num / (float)net.max_batches, net.power);
             //if (batch_num < net.burn_in) return net.learning_rate * pow((float)batch_num / net.burn_in, net.power);
