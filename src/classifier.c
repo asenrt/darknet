@@ -120,6 +120,9 @@ void train_classifier(char* datacfg, char* cfgfile, char* weightfile, int* gpus,
     args.m = train_images_num;
     args.labels = labels;
     args.type = CLASSIFICATION_DATA;
+    int slLaunchesCount = 0;
+    int nextsl = net.sl_launch_iterations;
+    int slstep = net.sl_launch_iterations;
 
 
     list* noise_paths_list = NULL;
@@ -193,36 +196,53 @@ void train_classifier(char* datacfg, char* cfgfile, char* weightfile, int* gpus,
 
         i = get_current_batch(net);
 
-        int calc_topk_for_each = iter_topk + 2 * train_images_num / (net.batch * net.subdivisions);  // calculate TOPk for each 2 Epochs
-        calc_topk_for_each = fmax(calc_topk_for_each, net.burn_in);
-        calc_topk_for_each = fmax(calc_topk_for_each, 100);
-        if (i % 10 == 0) {
-            if (calc_topk) {
-                fprintf(stderr, "\n (next TOP%d calculation at %d iterations) ", topk_data, calc_topk_for_each);
-                if (topk > 0) fprintf(stderr, " Last accuracy TOP%d = %2.2f %% \n", topk_data, topk * 100);
-            }
 
-            if (net.cudnn_half) {
-                if (i < net.burn_in * 3) fprintf(stderr, " Tensor Cores are disabled until the first %d iterations are reached.\n", 3 * net.burn_in);
-                else fprintf(stderr, " Tensor Cores are used.\n");
-            }
+        // Launch external program 
+        if (*net.cur_iteration >= nextsl && net.sl_external_proc_cmd != NULL && net.sl_external_proc_cmd[0] != '\0') {
+            nextsl = *net.cur_iteration + slstep;
+            slLaunchesCount++;
+
+            // Make the lauch command and launch
+            char* cmdline = malloc(sizeof(char) * 1024);
+            char* pos = cmdline;
+            pos += sprintf(cmdline, net.sl_external_proc_cmd);
+            pos += sprintf(pos, " -ITERATION %d", *net.cur_iteration);
+            pos += sprintf(pos, " -LAUNCH %d", slLaunchesCount);
+            pos += sprintf(pos, " -mapLR %f", get_current_rate(net));
+
+            launchExternalProc(cmdline);
         }
+
+        //int calc_topk_for_each = iter_topk + 2 * train_images_num / (net.batch * net.subdivisions);  // calculate TOPk for each 2 Epochs
+        //calc_topk_for_each = fmax(calc_topk_for_each, net.burn_in);
+        //calc_topk_for_each = fmax(calc_topk_for_each, 100);
+        //if (i % 10 == 0) {
+        //    if (calc_topk) {
+        //        fprintf(stderr, "\n (next TOP%d calculation at %d iterations) ", topk_data, calc_topk_for_each);
+        //        if (topk > 0) fprintf(stderr, " Last accuracy TOP%d = %2.2f %% \n", topk_data, topk * 100);
+        //    }
+
+        //    if (net.cudnn_half) {
+        //        if (i < net.burn_in * 3) fprintf(stderr, " Tensor Cores are disabled until the first %d iterations are reached.\n", 3 * net.burn_in);
+        //        else fprintf(stderr, " Tensor Cores are used.\n");
+        //    }
+        //}
 
         int draw_precision = 0;
-        if (calc_topk && (i >= calc_topk_for_each || i == net.max_batches)) {
-            iter_topk = i;
-            if (net.contrastive && l.type != SOFTMAX && l.type != COST) {
-                int k;
-                for (k = 0; k < net.n; ++k) if (net.layers[k].type == CONTRASTIVE) break;
-                topk = *(net.layers[k].loss) / 100;
-                sprintf(topk_buff, "Contr");
-            }
-            else {
-                topk = validate_classifier_single(datacfg, cfgfile, weightfile, &net, topk_data); // calc TOP-n
-                printf("\n accuracy %s = %f \n", topk_buff, topk);
-            }
-            draw_precision = 1;
-        }
+        //if (calc_topk && (i >= calc_topk_for_each || i == net.max_batches)) {
+        //    iter_topk = i;
+        //    if (net.contrastive && l.type != SOFTMAX && l.type != COST) {
+        //        int k;
+        //        for (k = 0; k < net.n; ++k) if (net.layers[k].type == CONTRASTIVE) break;
+        //        topk = *(net.layers[k].loss) / 100;
+        //        sprintf(topk_buff, "Contr");
+        //    }
+        //    else {
+        //        topk = validate_classifier_single(datacfg, cfgfile, weightfile, &net, topk_data); // calc TOP-n
+        //        printf("\n accuracy %s = %f \n", topk_buff, topk);
+        //    }
+        //    draw_precision = 1;
+        //}
 
         time_remaining = ((net.max_batches - i) / ngpus) * (what_time_is_it_now() - start) / 60 / 60;
         // set initial value, even if resume training from 10000 iteration
@@ -238,7 +258,7 @@ void train_classifier(char* datacfg, char* cfgfile, char* weightfile, int* gpus,
         printf("   LOSS: %4.4f \n", loss);
         printf("   AVGL: %4.4f \n", avg_loss);
         printf("    ETA: %4.2fh \n", avg_time);
-        printf(" TOPKAT: %d \n", calc_topk_for_each);
+        printf(" NEXTSL: %d \n", nextsl);
 
 
 #ifdef OPENCV
