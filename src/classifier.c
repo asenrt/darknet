@@ -709,7 +709,7 @@ float validate_classifier_single(char* datacfg, char* filename, char* weightfile
         valid_csv = fopen(net.map_report_file, "ab");
 
         if (add_header)
-            fprintf(valid_csv, "top1, topn,\n");
+            fprintf(valid_csv, "top1, topn, iteration\n");
     }
 
 
@@ -764,7 +764,7 @@ float validate_classifier_single(char* datacfg, char* filename, char* weightfile
 
 
     if (valid_csv != NULL) {
-        fprintf(valid_csv, "%f, %f, \n", avg_acc / m, avg_topk / m);
+        fprintf(valid_csv, "%f, %f, %d \n", avg_acc / m, avg_topk / m, *net.cur_iteration);
         fclose(valid_csv);
         printf("\nValidation csv saved as %s", net.map_report_file);
     }
