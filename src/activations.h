@@ -127,6 +127,14 @@ static inline float gelu_gradient(float x) {
 }
 static inline float plse_gradient(float x){return (x < 0 || x > 1) ? .01f : .125f;}
 
+static inline float relun_activate(float x) {
+    return (x - floorf(x)) / (ceilf(x) - floorf(x));
+}
+
+static inline float relun_gradient(float x) {
+    return 1 / (ceilf(x) - floorf(x));
+}
+
 #ifdef __cplusplus
 }
 #endif

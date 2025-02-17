@@ -56,6 +56,7 @@ ACTIVATION get_activation(char *s)
     if (strcmp(s, "normalize_channels_softmax_maxval") == 0) return NORM_CHAN_SOFTMAX_MAXVAL;
     if (strcmp(s, "loggy")==0) return LOGGY;
     if (strcmp(s, "relu")==0) return RELU;
+    if (strcmp(s, "relun") == 0) return RELUN;
     if (strcmp(s, "relu6") == 0) return RELU6;
     if (strcmp(s, "elu")==0) return ELU;
     if (strcmp(s, "selu") == 0) return SELU;
@@ -85,6 +86,8 @@ float activate(float x, ACTIVATION a)
             return loggy_activate(x);
         case RELU:
             return relu_activate(x);
+        case RELUN:
+            return relun_activate(x);
         case ELU:
             return elu_activate(x);
         case SELU:
@@ -318,6 +321,8 @@ float gradient(float x, ACTIVATION a)
             return relu_gradient(x);
         case RELU6:
             return relu6_gradient(x);
+        case RELUN:
+            return relun_gradient(x);
         case NORM_CHAN:
             //return relu_gradient(x);
         case NORM_CHAN_SOFTMAX_MAXVAL:
