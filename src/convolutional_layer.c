@@ -77,13 +77,20 @@ void binarize_input(float *input, int n, int size, float *binary)
 
 int convolutional_out_height(convolutional_layer l)
 {
-    return (l.h + 2*l.pad - l.size) / l.stride_y + 1;
+    //The original does notr care about dilation
+    //return (l.h + 2*l.pad - l.size) / l.stride_y + 1;
+    int effective_k = l.size + (l.size - 1) * (l.dilation - 1);
+    return (l.h + 2 * l.pad - effective_k) / l.stride_y + 1;
 }
 
 int convolutional_out_width(convolutional_layer l)
 {
-    return (l.w + 2*l.pad - l.size) / l.stride_x + 1;
+    //return (l.w + 2*l.pad - l.size) / l.stride_x + 1;
+    int effective_k = l.size + (l.size - 1) * (l.dilation - 1);
+    return (l.w + 2 * l.pad - effective_k) / l.stride_x + 1;
 }
+
+
 
 image get_convolutional_image(convolutional_layer l)
 {
@@ -279,7 +286,7 @@ void cudnn_convolutional_setup(layer *l, int cudnn_preference, size_t workspace_
     //printf("\n l->dilation = %d, l->pad = %d, l->size = %d, l->stride = %d, l->stride_x = %d, l->stride_y = %d, l->groups = %d, l->w = %d, l->h = %d, l->c = %d, l->n = %d, l->out_w = %d, l->out_h = %d, l->out_c = %d, l->batch = %d, data_type = %d \n",
     //    l->dilation, l->pad, l->size, l->stride, l->stride_x, l->stride_y, l->groups, l->w, l->h, l->c, l->n, l->out_w, l->out_h, l->out_c, l->batch, data_type);
 #if(CUDNN_MAJOR >= 6)
-    CHECK_CUDNN(cudnnSetConvolution2dDescriptor(l->convDesc, l->pad * l->dilation, l->pad * l->dilation, l->stride_y, l->stride_x, l->dilation, l->dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));    // cudnn >= 6.0
+    CHECK_CUDNN(cudnnSetConvolution2dDescriptor(l->convDesc, l->pad , l->pad , l->stride_y, l->stride_x, l->dilation, l->dilation, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));    // cudnn >= 6.0
 #else
     CHECK_CUDNN(cudnnSetConvolution2dDescriptor(l->convDesc, l->pad * l->dilation, l->pad * l->dilation, l->stride_y, l->stride_x, l->dilation, l->dilation, CUDNN_CROSS_CORRELATION));    // cudnn 5.1
 #endif
